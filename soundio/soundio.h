@@ -312,7 +312,7 @@ enum SoundIoFormat
 /// The size of this struct is OK to use.
 struct SoundIoChannelLayout
 {
-    const char *name;
+    const char* name;
     int channel_count;
     enum SoundIoChannelId channels[SOUNDIO_MAX_CHANNELS];
 };
@@ -328,7 +328,7 @@ struct SoundIoSampleRateRange
 struct SoundIoChannelArea
 {
     /// Base address of buffer.
-    char *ptr;
+    char* ptr;
     /// How many bytes it takes to get from the beginning of one sample to
     /// the beginning of the next sample.
     int step;
@@ -338,11 +338,11 @@ struct SoundIoChannelArea
 struct SoundIo
 {
     /// Optional. Put whatever you want here. Defaults to NULL.
-    void *userdata;
+    void* userdata;
 
     /// Optional callback. Called when the list of devices change. Only called
     /// during a call to ::soundio_flush_events or ::soundio_wait_events.
-    void (*on_devices_change)(struct SoundIo *);
+    void (*on_devices_change)(struct SoundIo*);
 
     /// Optional callback. Called when the backend disconnects. For example,
     /// when the JACK server shuts down. When this happens, listing devices
@@ -360,12 +360,12 @@ struct SoundIo
     /// * #SoundIoErrorSystemResources
     /// * #SoundIoErrorOpeningDevice - unexpected problem accessing device
     ///   information
-    void (*on_backend_disconnect)(struct SoundIo *, int err);
+    void (*on_backend_disconnect)(struct SoundIo*, int err);
 
     /// Optional callback. Called from an unknown thread that you should not use
     /// to call any soundio functions. You may use this to signal a condition
     /// variable to wake up. Called when ::soundio_wait_events would be woken up.
-    void (*on_events_signal)(struct SoundIo *);
+    void (*on_events_signal)(struct SoundIo*);
 
     /// Read-only. After calling ::soundio_connect or ::soundio_connect_backend,
     /// this field tells which backend is currently connected.
@@ -375,7 +375,7 @@ struct SoundIo
     /// PulseAudio uses this for "application name".
     /// JACK uses this for `client_name`.
     /// Must not contain a colon (":").
-    const char *app_name;
+    const char* app_name;
 
     /// Optional: Real time priority warning.
     /// This callback is fired when making thread real-time priority failed. By
@@ -391,18 +391,18 @@ struct SoundIo
     /// setting this to `NULL` or providing your own function. This is
     /// registered with JACK regardless of whether ::soundio_connect_backend
     /// succeeds.
-    void (*jack_info_callback)(const char *msg);
+    void (*jack_info_callback)(const char* msg);
 
     /// Optional: JACK error callback.
     /// See SoundIo::jack_info_callback
-    void (*jack_error_callback)(const char *msg);
+    void (*jack_error_callback)(const char* msg);
 };
 
 /// The size of this struct is not part of the API or ABI.
 struct SoundIoDevice
 {
     /// Read-only. Set automatically.
-    struct SoundIo *soundio;
+    struct SoundIo* soundio;
 
     /// A string of bytes that uniquely identifies this device.
     /// If the same physical device supports both input and output, that makes
@@ -412,9 +412,9 @@ struct SoundIoDevice
     /// supports raw mode, there may be up to four devices with the same id:
     /// one for each value of SoundIoDevice::is_raw and one for each value of
     /// SoundIoDevice::aim.
-    char *id;
+    char* id;
     /// User-friendly UTF-8 encoded text to describe the device.
-    char *name;
+    char* name;
 
     /// Tells whether this device is an input device or an output device.
     enum SoundIoDeviceAim aim;
@@ -424,14 +424,14 @@ struct SoundIoDevice
     /// layouts will be NULL. It's OK to modify this data, for example calling
     /// ::soundio_sort_channel_layouts on it.
     /// Devices are guaranteed to have at least 1 channel layout.
-    struct SoundIoChannelLayout *layouts;
+    struct SoundIoChannelLayout* layouts;
     int layout_count;
     /// See SoundIoDevice::current_format
     struct SoundIoChannelLayout current_layout;
 
     /// List of formats this device supports. See also
     /// SoundIoDevice::current_format.
-    enum SoundIoFormat *formats;
+    enum SoundIoFormat* formats;
     /// How many formats are available in SoundIoDevice::formats.
     int format_count;
     /// A device is either a raw device or it is a virtual device that is
@@ -460,7 +460,7 @@ struct SoundIoDevice
     /// will be set to NULL.
     /// Devices which have SoundIoDevice::probe_error set to #SoundIoErrorNone are
     /// guaranteed to have at least 1 sample rate available.
-    struct SoundIoSampleRateRange *sample_rates;
+    struct SoundIoSampleRateRange* sample_rates;
     /// How many sample rate ranges are available in
     /// SoundIoDevice::sample_rates. 0 if sample rate information is missing
     /// due to a probe error.
@@ -513,7 +513,7 @@ struct SoundIoDevice
 struct SoundIoOutStream
 {
     /// Populated automatically when you call ::soundio_outstream_create.
-    struct SoundIoDevice *device;
+    struct SoundIoDevice* device;
 
     /// Defaults to #SoundIoFormatFloat32NE, followed by the first one
     /// supported.
@@ -521,7 +521,7 @@ struct SoundIoOutStream
 
     /// Sample rate is the number of frames per second.
     /// Defaults to 48000 (and then clamped into range).
-    unsigned long sample_rate;
+    int sample_rate;
 
     /// Defaults to Stereo, if available, followed by the first layout
     /// supported.
@@ -556,7 +556,7 @@ struct SoundIoOutStream
     /// Core Audio and WASAPI only: current output Audio Unit volume. Float, 0.0-1.0.
     float volume;
     /// Defaults to NULL. Put whatever you want here.
-    void *userdata;
+    void* userdata;
 
     /// In this callback, you call ::soundio_outstream_begin_write and
     /// ::soundio_outstream_end_write as many times as necessary to write
@@ -574,14 +574,14 @@ struct SoundIoOutStream
     /// for a long time. This includes all I/O functions (disk, TTY, network),
     /// malloc, free, printf, pthread_mutex_lock, sleep, wait, poll, select,
     /// pthread_join, pthread_cond_wait, etc.
-    void (*write_callback)(struct SoundIoOutStream *,
+    void (*write_callback)(struct SoundIoOutStream*,
                            int frame_count_min, int frame_count_max);
 
     /// This optional callback happens when the sound device runs out of
     /// buffered audio data to play. After this occurs, the outstream waits
     /// until the buffer is full to resume playback.
     /// This is called from the SoundIoOutStream::write_callback thread context.
-    void (*underflow_callback)(struct SoundIoOutStream *);
+    void (*underflow_callback)(struct SoundIoOutStream*);
 
     /// Optional callback. `err` is always SoundIoErrorStreaming.
     /// SoundIoErrorStreaming is an unrecoverable error. The stream is in an
@@ -589,7 +589,7 @@ struct SoundIoOutStream
     /// If you do not supply error_callback, the default callback will print
     /// a message to stderr and then call `abort`.
     /// This is called from the SoundIoOutStream::write_callback thread context.
-    void (*error_callback)(struct SoundIoOutStream *, int err);
+    void (*error_callback)(struct SoundIoOutStream*, int err);
 
     /// Optional: Name of the stream. Defaults to "SoundIoOutStream"
     /// PulseAudio uses this for the stream name.
@@ -597,7 +597,7 @@ struct SoundIoOutStream
     /// open the stream.
     /// WASAPI uses this for the session display name.
     /// Must not contain a colon (":").
-    const char *name;
+    const char* name;
 
     /// Optional: Hint that this output stream is nonterminal. This is used by
     /// JACK and it means that the output stream data originates from an input
@@ -620,7 +620,7 @@ struct SoundIoOutStream
 struct SoundIoInStream
 {
     /// Populated automatically when you call ::soundio_outstream_create.
-    struct SoundIoDevice *device;
+    struct SoundIoDevice* device;
 
     /// Defaults to #SoundIoFormatFloat32NE, followed by the first one
     /// supported.
@@ -649,7 +649,7 @@ struct SoundIoInStream
     double software_latency;
 
     /// Defaults to NULL. Put whatever you want here.
-    void *userdata;
+    void* userdata;
 
     /// In this function call ::soundio_instream_begin_read and
     /// ::soundio_instream_end_read as many times as necessary to read at
@@ -663,13 +663,13 @@ struct SoundIoInStream
     /// for a long time. This includes all I/O functions (disk, TTY, network),
     /// malloc, free, printf, pthread_mutex_lock, sleep, wait, poll, select,
     /// pthread_join, pthread_cond_wait, etc.
-    void (*read_callback)(struct SoundIoInStream *, int frame_count_min, int frame_count_max);
+    void (*read_callback)(struct SoundIoInStream*, int frame_count_min, int frame_count_max);
 
     /// This optional callback happens when the sound device buffer is full,
     /// yet there is more captured audio to put in it.
     /// This is never fired for PulseAudio.
     /// This is called from the SoundIoInStream::read_callback thread context.
-    void (*overflow_callback)(struct SoundIoInStream *);
+    void (*overflow_callback)(struct SoundIoInStream*);
 
     /// Optional callback. `err` is always SoundIoErrorStreaming.
     /// SoundIoErrorStreaming is an unrecoverable error. The stream is in an
@@ -677,7 +677,7 @@ struct SoundIoInStream
     /// If you do not supply `error_callback`, the default callback will print
     /// a message to stderr and then abort().
     /// This is called from the SoundIoInStream::read_callback thread context.
-    void (*error_callback)(struct SoundIoInStream *, int err);
+    void (*error_callback)(struct SoundIoInStream*, int err);
 
     /// Optional: Name of the stream. Defaults to "SoundIoInStream";
     /// PulseAudio uses this for the stream name.
@@ -685,7 +685,7 @@ struct SoundIoInStream
     /// open the stream.
     /// WASAPI uses this for the session display name.
     /// Must not contain a colon (":").
-    const char *name;
+    const char* name;
 
     /// Optional: Hint that this input stream is nonterminal. This is used by
     /// JACK and it means that the data received by the stream will be
@@ -703,7 +703,7 @@ struct SoundIoInStream
 };
 
 /// See also ::soundio_version_major, ::soundio_version_minor, ::soundio_version_patch
-SOUNDIO_EXPORT const char *soundio_version_string(void);
+SOUNDIO_EXPORT const char* soundio_version_string(void);
 
 /// See also ::soundio_version_string, ::soundio_version_minor, ::soundio_version_patch
 SOUNDIO_EXPORT int soundio_version_major(void);
@@ -718,9 +718,9 @@ SOUNDIO_EXPORT int soundio_version_patch(void);
 /// connect to multiple backends. Sets all fields to defaults.
 /// Returns `NULL` if and only if memory could not be allocated.
 /// See also ::soundio_destroy
-SOUNDIO_EXPORT struct SoundIo *soundio_create(void);
+SOUNDIO_EXPORT struct SoundIo* soundio_create(void);
 
-SOUNDIO_EXPORT void soundio_destroy(struct SoundIo *soundio);
+SOUNDIO_EXPORT void soundio_destroy(struct SoundIo* soundio);
 
 
 /// Tries ::soundio_connect_backend on all available backends in order.
@@ -730,7 +730,7 @@ SOUNDIO_EXPORT void soundio_destroy(struct SoundIo *soundio);
 /// * #SoundIoErrorSystemResources
 /// * #SoundIoErrorNoSuchClient - when JACK returns `JackNoSuchClient`
 /// See also ::soundio_disconnect
-SOUNDIO_EXPORT int soundio_connect(struct SoundIo *soundio);
+SOUNDIO_EXPORT int soundio_connect(struct SoundIo* soundio);
 
 /// Instead of calling ::soundio_connect you may call this function to try a
 /// specific backend.
@@ -743,22 +743,22 @@ SOUNDIO_EXPORT int soundio_connect(struct SoundIo *soundio);
 /// * #SoundIoErrorInitAudioBackend - requested `backend` is not active
 /// * #SoundIoErrorBackendDisconnected - backend disconnected while connecting
 /// See also ::soundio_disconnect
-SOUNDIO_EXPORT int soundio_connect_backend(struct SoundIo *soundio, enum SoundIoBackend backend);
+SOUNDIO_EXPORT int soundio_connect_backend(struct SoundIo* soundio, enum SoundIoBackend backend);
 
-SOUNDIO_EXPORT void soundio_disconnect(struct SoundIo *soundio);
+SOUNDIO_EXPORT void soundio_disconnect(struct SoundIo* soundio);
 
 /// Get a string representation of a #SoundIoError
-SOUNDIO_EXPORT const char *soundio_strerror(int error);
+SOUNDIO_EXPORT const char* soundio_strerror(int error);
 
 /// Get a string representation of a #SoundIoBackend
-SOUNDIO_EXPORT const char *soundio_backend_name(enum SoundIoBackend backend);
+SOUNDIO_EXPORT const char* soundio_backend_name(enum SoundIoBackend backend);
 
 /// Returns the number of available backends.
-SOUNDIO_EXPORT int soundio_backend_count(struct SoundIo *soundio);
+SOUNDIO_EXPORT int soundio_backend_count(struct SoundIo* soundio);
 
 /// get the available backend at the specified index
 /// (0 <= index < ::soundio_backend_count)
-SOUNDIO_EXPORT enum SoundIoBackend soundio_get_backend(struct SoundIo *soundio, int index);
+SOUNDIO_EXPORT enum SoundIoBackend soundio_get_backend(struct SoundIo* soundio, int index);
 
 /// Returns whether libsoundio was compiled with backend.
 SOUNDIO_EXPORT bool soundio_have_backend(enum SoundIoBackend backend);
@@ -785,14 +785,14 @@ SOUNDIO_EXPORT bool soundio_have_backend(enum SoundIoBackend backend);
 /// Note that if you do not care about learning about updated devices, you
 /// might call this function only once ever and never call
 /// ::soundio_wait_events.
-SOUNDIO_EXPORT void soundio_flush_events(struct SoundIo *soundio);
+SOUNDIO_EXPORT void soundio_flush_events(struct SoundIo* soundio);
 
 /// This function calls ::soundio_flush_events then blocks until another event
 /// is ready or you call ::soundio_wakeup. Be ready for spurious wakeups.
-SOUNDIO_EXPORT void soundio_wait_events(struct SoundIo *soundio);
+SOUNDIO_EXPORT void soundio_wait_events(struct SoundIo* soundio);
 
 /// Makes ::soundio_wait_events stop blocking.
-SOUNDIO_EXPORT void soundio_wakeup(struct SoundIo *soundio);
+SOUNDIO_EXPORT void soundio_wakeup(struct SoundIo* soundio);
 
 
 /// If necessary you can manually trigger a device rescan. Normally you will
@@ -809,7 +809,7 @@ SOUNDIO_EXPORT void soundio_wakeup(struct SoundIo *soundio);
 ///
 /// This can be called from any thread context except for
 /// SoundIoOutStream::write_callback and SoundIoInStream::read_callback
-SOUNDIO_EXPORT void soundio_force_device_scan(struct SoundIo *soundio);
+SOUNDIO_EXPORT void soundio_force_device_scan(struct SoundIo* soundio);
 
 
 // Channel Layouts
@@ -817,15 +817,15 @@ SOUNDIO_EXPORT void soundio_force_device_scan(struct SoundIo *soundio);
 /// Returns whether the channel count field and each channel id matches in
 /// the supplied channel layouts.
 SOUNDIO_EXPORT bool soundio_channel_layout_equal(
-    const struct SoundIoChannelLayout *a,
-    const struct SoundIoChannelLayout *b);
+    const struct SoundIoChannelLayout* a,
+    const struct SoundIoChannelLayout* b);
 
-SOUNDIO_EXPORT const char *soundio_get_channel_name(enum SoundIoChannelId id);
+SOUNDIO_EXPORT const char* soundio_get_channel_name(enum SoundIoChannelId id);
 
 /// Given UTF-8 encoded text which is the name of a channel such as
 /// "Front Left", "FL", or "front-left", return the corresponding
 /// SoundIoChannelId. Returns SoundIoChannelIdInvalid for no match.
-SOUNDIO_EXPORT enum SoundIoChannelId soundio_parse_channel_id(const char *str, int str_len);
+SOUNDIO_EXPORT enum SoundIoChannelId soundio_parse_channel_id(const char* str, int str_len);
 
 /// Returns the number of builtin channel layouts.
 SOUNDIO_EXPORT int soundio_channel_layout_builtin_count(void);
@@ -834,28 +834,28 @@ SOUNDIO_EXPORT int soundio_channel_layout_builtin_count(void);
 ///
 /// Although `index` is of type `int`, it should be a valid
 /// #SoundIoChannelLayoutId enum value.
-SOUNDIO_EXPORT const struct SoundIoChannelLayout *soundio_channel_layout_get_builtin(int index);
+SOUNDIO_EXPORT const struct SoundIoChannelLayout* soundio_channel_layout_get_builtin(int index);
 
 /// Get the default builtin channel layout for the given number of channels.
-SOUNDIO_EXPORT const struct SoundIoChannelLayout *soundio_channel_layout_get_default(int channel_count);
+SOUNDIO_EXPORT const struct SoundIoChannelLayout* soundio_channel_layout_get_default(int channel_count);
 
 /// Return the index of `channel` in `layout`, or `-1` if not found.
 SOUNDIO_EXPORT int soundio_channel_layout_find_channel(
-    const struct SoundIoChannelLayout *layout, enum SoundIoChannelId channel);
+    const struct SoundIoChannelLayout* layout, enum SoundIoChannelId channel);
 
 /// Populates the name field of layout if it matches a builtin one.
 /// returns whether it found a match
-SOUNDIO_EXPORT bool soundio_channel_layout_detect_builtin(struct SoundIoChannelLayout *layout);
+SOUNDIO_EXPORT bool soundio_channel_layout_detect_builtin(struct SoundIoChannelLayout* layout);
 
 /// Iterates over preferred_layouts. Returns the first channel layout in
 /// preferred_layouts which matches one of the channel layouts in
 /// available_layouts. Returns NULL if none matches.
-SOUNDIO_EXPORT const struct SoundIoChannelLayout *soundio_best_matching_channel_layout(
-    const struct SoundIoChannelLayout *preferred_layouts, int preferred_layout_count,
-    const struct SoundIoChannelLayout *available_layouts, int available_layout_count);
+SOUNDIO_EXPORT const struct SoundIoChannelLayout* soundio_best_matching_channel_layout(
+    const struct SoundIoChannelLayout* preferred_layouts, int preferred_layout_count,
+    const struct SoundIoChannelLayout* available_layouts, int available_layout_count);
 
 /// Sorts by channel count, descending.
-SOUNDIO_EXPORT void soundio_sort_channel_layouts(struct SoundIoChannelLayout *layouts, int layout_count);
+SOUNDIO_EXPORT void soundio_sort_channel_layouts(struct SoundIoChannelLayout* layouts, int layout_count);
 
 
 // Sample Formats
@@ -877,7 +877,7 @@ static inline int soundio_get_bytes_per_second(enum SoundIoFormat format,
 }
 
 /// Returns string representation of `format`.
-SOUNDIO_EXPORT const char *soundio_format_string(enum SoundIoFormat format);
+SOUNDIO_EXPORT const char* soundio_format_string(enum SoundIoFormat format);
 
 
 // Devices
@@ -891,68 +891,68 @@ SOUNDIO_EXPORT const char *soundio_format_string(enum SoundIoFormat format);
 
 /// Get the number of input devices.
 /// Returns -1 if you never called ::soundio_flush_events.
-SOUNDIO_EXPORT int soundio_input_device_count(struct SoundIo *soundio);
+SOUNDIO_EXPORT int soundio_input_device_count(struct SoundIo* soundio);
 
 /// Get the number of output devices.
 /// Returns -1 if you never called ::soundio_flush_events.
-SOUNDIO_EXPORT int soundio_output_device_count(struct SoundIo *soundio);
+SOUNDIO_EXPORT int soundio_output_device_count(struct SoundIo* soundio);
 
 /// Always returns a device. Call ::soundio_device_unref when done.
 /// `index` must be 0 <= index < ::soundio_input_device_count
 /// Returns NULL if you never called ::soundio_flush_events or if you provide
 /// invalid parameter values.
-SOUNDIO_EXPORT struct SoundIoDevice *soundio_get_input_device(struct SoundIo *soundio, int index);
+SOUNDIO_EXPORT struct SoundIoDevice* soundio_get_input_device(struct SoundIo* soundio, int index);
 
 /// Always returns a device. Call ::soundio_device_unref when done.
 /// `index` must be 0 <= index < ::soundio_output_device_count
 /// Returns NULL if you never called ::soundio_flush_events or if you provide
 /// invalid parameter values.
-SOUNDIO_EXPORT struct SoundIoDevice *soundio_get_output_device(struct SoundIo *soundio, int index);
+SOUNDIO_EXPORT struct SoundIoDevice* soundio_get_output_device(struct SoundIo* soundio, int index);
 
 /// returns the index of the default input device
 /// returns -1 if there are no devices or if you never called
 /// ::soundio_flush_events.
-SOUNDIO_EXPORT int soundio_default_input_device_index(struct SoundIo *soundio);
+SOUNDIO_EXPORT int soundio_default_input_device_index(struct SoundIo* soundio);
 
 /// returns the index of the default output device
 /// returns -1 if there are no devices or if you never called
 /// ::soundio_flush_events.
-SOUNDIO_EXPORT int soundio_default_output_device_index(struct SoundIo *soundio);
+SOUNDIO_EXPORT int soundio_default_output_device_index(struct SoundIo* soundio);
 
 /// Add 1 to the reference count of `device`.
-SOUNDIO_EXPORT void soundio_device_ref(struct SoundIoDevice *device);
+SOUNDIO_EXPORT void soundio_device_ref(struct SoundIoDevice* device);
 
 /// Remove 1 to the reference count of `device`. Clean up if it was the last
 /// reference.
-SOUNDIO_EXPORT void soundio_device_unref(struct SoundIoDevice *device);
+SOUNDIO_EXPORT void soundio_device_unref(struct SoundIoDevice* device);
 
 /// Return `true` if and only if the devices have the same SoundIoDevice::id,
 /// SoundIoDevice::is_raw, and SoundIoDevice::aim are the same.
 SOUNDIO_EXPORT bool soundio_device_equal(
-    const struct SoundIoDevice *a,
-    const struct SoundIoDevice *b);
+    const struct SoundIoDevice* a,
+    const struct SoundIoDevice* b);
 
 /// Sorts channel layouts by channel count, descending.
-SOUNDIO_EXPORT void soundio_device_sort_channel_layouts(struct SoundIoDevice *device);
+SOUNDIO_EXPORT void soundio_device_sort_channel_layouts(struct SoundIoDevice* device);
 
 /// Convenience function. Returns whether `format` is included in the device's
 /// supported formats.
-SOUNDIO_EXPORT bool soundio_device_supports_format(struct SoundIoDevice *device,
+SOUNDIO_EXPORT bool soundio_device_supports_format(struct SoundIoDevice* device,
                                                    enum SoundIoFormat format);
 
 /// Convenience function. Returns whether `layout` is included in the device's
 /// supported channel layouts.
-SOUNDIO_EXPORT bool soundio_device_supports_layout(struct SoundIoDevice *device,
-                                                   const struct SoundIoChannelLayout *layout);
+SOUNDIO_EXPORT bool soundio_device_supports_layout(struct SoundIoDevice* device,
+                                                   const struct SoundIoChannelLayout* layout);
 
 /// Convenience function. Returns whether `sample_rate` is included in the
 /// device's supported sample rates.
-SOUNDIO_EXPORT bool soundio_device_supports_sample_rate(struct SoundIoDevice *device,
+SOUNDIO_EXPORT bool soundio_device_supports_sample_rate(struct SoundIoDevice* device,
                                                         int sample_rate);
 
 /// Convenience function. Returns the available sample rate nearest to
 /// `sample_rate`, rounding up.
-SOUNDIO_EXPORT int soundio_device_nearest_sample_rate(struct SoundIoDevice *device,
+SOUNDIO_EXPORT int soundio_device_nearest_sample_rate(struct SoundIoDevice* device,
                                                       int sample_rate);
 
 
@@ -961,10 +961,10 @@ SOUNDIO_EXPORT int soundio_device_nearest_sample_rate(struct SoundIoDevice *devi
 /// and then call ::soundio_outstream_open. Sets all fields to defaults.
 /// Returns `NULL` if and only if memory could not be allocated.
 /// See also ::soundio_outstream_destroy
-SOUNDIO_EXPORT struct SoundIoOutStream *soundio_outstream_create(struct SoundIoDevice *device);
+SOUNDIO_EXPORT struct SoundIoOutStream* soundio_outstream_create(struct SoundIoDevice* device);
 
 /// You may not call this function from the SoundIoOutStream::write_callback thread context.
-SOUNDIO_EXPORT void soundio_outstream_destroy(struct SoundIoOutStream *outstream);
+SOUNDIO_EXPORT void soundio_outstream_destroy(struct SoundIoOutStream* outstream);
 
 /// After you call this function, SoundIoOutStream::software_latency is set to
 /// the correct value.
@@ -987,7 +987,7 @@ SOUNDIO_EXPORT void soundio_outstream_destroy(struct SoundIoOutStream *outstream
 ///   greater than the number of channels the backend can handle.
 /// * #SoundIoErrorIncompatibleDevice - stream parameters requested are not
 ///   compatible with the chosen device.
-SOUNDIO_EXPORT int soundio_outstream_open(struct SoundIoOutStream *outstream);
+SOUNDIO_EXPORT int soundio_outstream_open(struct SoundIoOutStream* outstream);
 
 /// After you call this function, SoundIoOutStream::write_callback will be called.
 ///
@@ -998,7 +998,7 @@ SOUNDIO_EXPORT int soundio_outstream_open(struct SoundIoOutStream *outstream);
 /// * #SoundIoErrorNoMem
 /// * #SoundIoErrorSystemResources
 /// * #SoundIoErrorBackendDisconnected
-SOUNDIO_EXPORT int soundio_outstream_start(struct SoundIoOutStream *outstream);
+SOUNDIO_EXPORT int soundio_outstream_start(struct SoundIoOutStream* outstream);
 
 /// Call this function when you are ready to begin writing to the device buffer.
 ///  * `outstream` - (in) The output stream you want to write to.
@@ -1030,8 +1030,8 @@ SOUNDIO_EXPORT int soundio_outstream_start(struct SoundIoOutStream *outstream);
 /// * #SoundIoErrorIncompatibleDevice - in rare cases it might just now
 ///   be discovered that the device uses non-byte-aligned access, in which
 ///   case this error code is returned.
-SOUNDIO_EXPORT int soundio_outstream_begin_write(struct SoundIoOutStream *outstream,
-                                                 struct SoundIoChannelArea **areas, int *frame_count);
+SOUNDIO_EXPORT int soundio_outstream_begin_write(struct SoundIoOutStream* outstream,
+                                                 struct SoundIoChannelArea** areas, int* frame_count);
 
 /// Commits the write that you began with ::soundio_outstream_begin_write.
 /// You must call this function only from the SoundIoOutStream::write_callback thread context.
@@ -1042,7 +1042,7 @@ SOUNDIO_EXPORT int soundio_outstream_begin_write(struct SoundIoOutStream *outstr
 ///   also get a SoundIoOutStream::underflow_callback, and you might not get
 ///   this error code when an underflow occurs. Unlike #SoundIoErrorStreaming,
 ///   the outstream is still in a valid state and streaming can continue.
-SOUNDIO_EXPORT int soundio_outstream_end_write(struct SoundIoOutStream *outstream);
+SOUNDIO_EXPORT int soundio_outstream_end_write(struct SoundIoOutStream* outstream);
 
 /// Clears the output stream buffer.
 /// This function can be called from any thread.
@@ -1057,7 +1057,7 @@ SOUNDIO_EXPORT int soundio_outstream_end_write(struct SoundIoOutStream *outstrea
 /// * #SoundIoErrorStreaming
 /// * #SoundIoErrorIncompatibleBackend
 /// * #SoundIoErrorIncompatibleDevice
-SOUNDIO_EXPORT int soundio_outstream_clear_buffer(struct SoundIoOutStream *outstream);
+SOUNDIO_EXPORT int soundio_outstream_clear_buffer(struct SoundIoOutStream* outstream);
 
 /// If the underlying backend and device support pausing, this pauses the
 /// stream. SoundIoOutStream::write_callback may be called a few more times if
@@ -1078,9 +1078,9 @@ SOUNDIO_EXPORT int soundio_outstream_clear_buffer(struct SoundIoOutStream *outst
 /// * #SoundIoErrorIncompatibleBackend - backend does not support
 ///   pausing/unpausing.
 /// * #SoundIoErrorInvalid - outstream not opened and started
-SOUNDIO_EXPORT int soundio_outstream_pause(struct SoundIoOutStream *outstream, bool pause);
+SOUNDIO_EXPORT int soundio_outstream_pause(struct SoundIoOutStream* outstream, bool pause);
 
-SOUNDIO_EXPORT int soundio_outstream_get_time(struct SoundIoOutStream *outstream, double *out_time);
+SOUNDIO_EXPORT int soundio_outstream_get_time(struct SoundIoOutStream* outstream, double* out_time);
 
 /// Obtain the total number of seconds that the next frame written after the
 /// last frame written with ::soundio_outstream_end_write will take to become
@@ -1093,10 +1093,10 @@ SOUNDIO_EXPORT int soundio_outstream_get_time(struct SoundIoOutStream *outstream
 ///
 /// Possible errors:
 /// * #SoundIoErrorStreaming
-SOUNDIO_EXPORT int soundio_outstream_get_latency(struct SoundIoOutStream *outstream,
-                                                 double *out_latency);
+SOUNDIO_EXPORT int soundio_outstream_get_latency(struct SoundIoOutStream* outstream,
+                                                 double* out_latency);
 
-SOUNDIO_EXPORT int soundio_outstream_set_volume(struct SoundIoOutStream *outstream,
+SOUNDIO_EXPORT int soundio_outstream_set_volume(struct SoundIoOutStream* outstream,
                                                 double volume);
 
 
@@ -1105,10 +1105,10 @@ SOUNDIO_EXPORT int soundio_outstream_set_volume(struct SoundIoOutStream *outstre
 /// and then call ::soundio_instream_open. Sets all fields to defaults.
 /// Returns `NULL` if and only if memory could not be allocated.
 /// See also ::soundio_instream_destroy
-SOUNDIO_EXPORT struct SoundIoInStream *soundio_instream_create(struct SoundIoDevice *device);
+SOUNDIO_EXPORT struct SoundIoInStream* soundio_instream_create(struct SoundIoDevice* device);
 
 /// You may not call this function from SoundIoInStream::read_callback.
-SOUNDIO_EXPORT void soundio_instream_destroy(struct SoundIoInStream *instream);
+SOUNDIO_EXPORT void soundio_instream_destroy(struct SoundIoInStream* instream);
 
 /// After you call this function, SoundIoInStream::software_latency is set to the correct
 /// value.
@@ -1128,7 +1128,7 @@ SOUNDIO_EXPORT void soundio_instream_destroy(struct SoundIoInStream *instream);
 /// * #SoundIoErrorNoSuchClient
 /// * #SoundIoErrorIncompatibleBackend
 /// * #SoundIoErrorIncompatibleDevice
-SOUNDIO_EXPORT int soundio_instream_open(struct SoundIoInStream *instream);
+SOUNDIO_EXPORT int soundio_instream_open(struct SoundIoInStream* instream);
 
 /// After you call this function, SoundIoInStream::read_callback will be called.
 ///
@@ -1137,7 +1137,7 @@ SOUNDIO_EXPORT int soundio_instream_open(struct SoundIoInStream *instream);
 /// * #SoundIoErrorStreaming
 /// * #SoundIoErrorOpeningDevice
 /// * #SoundIoErrorSystemResources
-SOUNDIO_EXPORT int soundio_instream_start(struct SoundIoInStream *instream);
+SOUNDIO_EXPORT int soundio_instream_start(struct SoundIoInStream* instream);
 
 /// Call this function when you are ready to begin reading from the device
 /// buffer.
@@ -1168,8 +1168,8 @@ SOUNDIO_EXPORT int soundio_instream_start(struct SoundIoInStream *instream);
 /// * #SoundIoErrorIncompatibleDevice - in rare cases it might just now
 ///   be discovered that the device uses non-byte-aligned access, in which
 ///   case this error code is returned.
-SOUNDIO_EXPORT int soundio_instream_begin_read(struct SoundIoInStream *instream,
-                                               struct SoundIoChannelArea **areas, int *frame_count);
+SOUNDIO_EXPORT int soundio_instream_begin_read(struct SoundIoInStream* instream,
+                                               struct SoundIoChannelArea** areas, int* frame_count);
 
 /// This will drop all of the frames from when you called
 /// ::soundio_instream_begin_read.
@@ -1179,7 +1179,7 @@ SOUNDIO_EXPORT int soundio_instream_begin_read(struct SoundIoInStream *instream,
 ///
 /// Possible errors:
 /// * #SoundIoErrorStreaming
-SOUNDIO_EXPORT int soundio_instream_end_read(struct SoundIoInStream *instream);
+SOUNDIO_EXPORT int soundio_instream_end_read(struct SoundIoInStream* instream);
 
 /// If the underyling device supports pausing, this pauses the stream and
 /// prevents SoundIoInStream::read_callback from being called. Otherwise this returns
@@ -1192,7 +1192,7 @@ SOUNDIO_EXPORT int soundio_instream_end_read(struct SoundIoInStream *instream);
 /// * #SoundIoErrorBackendDisconnected
 /// * #SoundIoErrorStreaming
 /// * #SoundIoErrorIncompatibleDevice - device does not support pausing/unpausing
-SOUNDIO_EXPORT int soundio_instream_pause(struct SoundIoInStream *instream, bool pause);
+SOUNDIO_EXPORT int soundio_instream_pause(struct SoundIoInStream* instream, bool pause);
 
 /// Obtain the number of seconds that the next frame of sound being
 /// captured will take to arrive in the buffer, plus the amount of time that is
@@ -1202,8 +1202,8 @@ SOUNDIO_EXPORT int soundio_instream_pause(struct SoundIoInStream *instream, bool
 ///
 /// Possible errors:
 /// * #SoundIoErrorStreaming
-SOUNDIO_EXPORT int soundio_instream_get_latency(struct SoundIoInStream *instream,
-                                                double *out_latency);
+SOUNDIO_EXPORT int soundio_instream_get_latency(struct SoundIoInStream* instream,
+                                                double* out_latency);
 
 
 struct SoundIoRingBuffer;
@@ -1217,33 +1217,33 @@ struct SoundIoRingBuffer;
 /// Use ::soundio_ring_buffer_capacity to get the actual capacity, which might
 /// be greater for alignment purposes.
 /// See also ::soundio_ring_buffer_destroy
-SOUNDIO_EXPORT struct SoundIoRingBuffer *soundio_ring_buffer_create(struct SoundIo *soundio, int requested_capacity);
+SOUNDIO_EXPORT struct SoundIoRingBuffer* soundio_ring_buffer_create(struct SoundIo* soundio, int requested_capacity);
 
-SOUNDIO_EXPORT void soundio_ring_buffer_destroy(struct SoundIoRingBuffer *ring_buffer);
+SOUNDIO_EXPORT void soundio_ring_buffer_destroy(struct SoundIoRingBuffer* ring_buffer);
 
 /// When you create a ring buffer, capacity might be more than the requested
 /// capacity for alignment purposes. This function returns the actual capacity.
-SOUNDIO_EXPORT int soundio_ring_buffer_capacity(struct SoundIoRingBuffer *ring_buffer);
+SOUNDIO_EXPORT int soundio_ring_buffer_capacity(struct SoundIoRingBuffer* ring_buffer);
 
 /// Do not write more than capacity.
-SOUNDIO_EXPORT char *soundio_ring_buffer_write_ptr(struct SoundIoRingBuffer *ring_buffer);
+SOUNDIO_EXPORT char* soundio_ring_buffer_write_ptr(struct SoundIoRingBuffer* ring_buffer);
 
 /// `count` in bytes.
-SOUNDIO_EXPORT void soundio_ring_buffer_advance_write_ptr(struct SoundIoRingBuffer *ring_buffer, int count);
+SOUNDIO_EXPORT void soundio_ring_buffer_advance_write_ptr(struct SoundIoRingBuffer* ring_buffer, int count);
 
 /// Do not read more than capacity.
-SOUNDIO_EXPORT char *soundio_ring_buffer_read_ptr(struct SoundIoRingBuffer *ring_buffer);
+SOUNDIO_EXPORT char* soundio_ring_buffer_read_ptr(struct SoundIoRingBuffer* ring_buffer);
 
 /// `count` in bytes.
-SOUNDIO_EXPORT void soundio_ring_buffer_advance_read_ptr(struct SoundIoRingBuffer *ring_buffer, int count);
+SOUNDIO_EXPORT void soundio_ring_buffer_advance_read_ptr(struct SoundIoRingBuffer* ring_buffer, int count);
 
 /// Returns how many bytes of the buffer is used, ready for reading.
-SOUNDIO_EXPORT int soundio_ring_buffer_fill_count(struct SoundIoRingBuffer *ring_buffer);
+SOUNDIO_EXPORT int soundio_ring_buffer_fill_count(struct SoundIoRingBuffer* ring_buffer);
 
 /// Returns how many bytes of the buffer is free, ready for writing.
-SOUNDIO_EXPORT int soundio_ring_buffer_free_count(struct SoundIoRingBuffer *ring_buffer);
+SOUNDIO_EXPORT int soundio_ring_buffer_free_count(struct SoundIoRingBuffer* ring_buffer);
 
 /// Must be called by the writer.
-SOUNDIO_EXPORT void soundio_ring_buffer_clear(struct SoundIoRingBuffer *ring_buffer);
+SOUNDIO_EXPORT void soundio_ring_buffer_clear(struct SoundIoRingBuffer* ring_buffer);
 
 #endif
