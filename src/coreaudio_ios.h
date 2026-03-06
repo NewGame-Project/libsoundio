@@ -13,8 +13,7 @@
 #include "list.h"
 #include "atomics.h"
 
-#include <AudioUnit/AudioUnit.h>
-#include <AVFoundation/AVFoundation.h>
+#include <AudioToolbox/AudioToolbox.h>
 
 struct SoundIoPrivate;
 int soundio_coreaudio_init(struct SoundIoPrivate *si);

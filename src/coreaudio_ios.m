@@ -13,12 +13,6 @@
 static const int OUTPUT_ELEMENT = 0;
 static const int INPUT_ELEMENT = 1;
 
-
-static enum SoundIoDeviceAim aims[] = {
-    SoundIoDeviceAimInput,
-    SoundIoDeviceAimOutput,
-};
-
 static void destroy_ca(struct SoundIoPrivate *si) {
     struct SoundIoCoreAudioIOS *sica = &si->backend_data.coreaudio_ios;
 
@@ -741,20 +735,20 @@ static void device_thread_run(void *arg) {
     }
 }
 
-static OSStatus on_outstream_device_overload(void *in_client_data)
-{
-    struct SoundIoOutStreamPrivate *os = (struct SoundIoOutStreamPrivate *)in_client_data;
-    struct SoundIoOutStream *outstream = &os->pub;
-    outstream->underflow_callback(outstream);
-    return noErr;
-}
+//static OSStatus on_outstream_device_overload(void *in_client_data)
+//{
+//    struct SoundIoOutStreamPrivate *os = (struct SoundIoOutStreamPrivate *)in_client_data;
+//    struct SoundIoOutStream *outstream = &os->pub;
+//    outstream->underflow_callback(outstream);
+//    return noErr;
+//}
 
 static void outstream_destroy_ca(struct SoundIoPrivate *si, struct SoundIoOutStreamPrivate *os) {
     struct SoundIoOutStreamCoreAudioIOS *osca = &os->backend_data.coreaudio_ios;
-    struct SoundIoOutStream *outstream = &os->pub;
-    struct SoundIoDevice *device = outstream->device;
-    struct SoundIoDevicePrivate *dev = (struct SoundIoDevicePrivate *)device;
-    struct SoundIoDeviceCoreAudioIOS *dca = &dev->backend_data.coreaudio_ios;
+//    struct SoundIoOutStream *outstream = &os->pub;
+//    struct SoundIoDevice *device = outstream->device;
+//    struct SoundIoDevicePrivate *dev = (struct SoundIoDevicePrivate *)device;
+//    struct SoundIoDeviceCoreAudioIOS *dca = &dev->backend_data.coreaudio_ios;
 
     if (osca->instance) {
         AudioOutputUnitStop(osca->instance);
@@ -959,26 +953,26 @@ static int outstream_get_latency_ca(struct SoundIoPrivate *si, struct SoundIoOut
 }
 
 static int outstream_set_volume_ca(struct SoundIoPrivate *si, struct SoundIoOutStreamPrivate *os, float volume) {
-    struct SoundIoOutStreamCoreAudioIOS *osca = &os->backend_data.coreaudio_ios;
+//    struct SoundIoOutStreamCoreAudioIOS *osca = &os->backend_data.coreaudio_ios;
     struct SoundIoOutStream *outstream = &os->pub;
     outstream->volume = volume;
     return 0;
 }
 
-static OSStatus on_instream_device_overload(void *in_client_data)
-{
-    struct SoundIoInStreamPrivate *os = (struct SoundIoInStreamPrivate *)in_client_data;
-    struct SoundIoInStream *instream = &os->pub;
-    instream->overflow_callback(instream);
-    return noErr;
-}
+//static OSStatus on_instream_device_overload(void *in_client_data)
+//{
+//    struct SoundIoInStreamPrivate *os = (struct SoundIoInStreamPrivate *)in_client_data;
+//    struct SoundIoInStream *instream = &os->pub;
+//    instream->overflow_callback(instream);
+//    return noErr;
+//}
 
 static void instream_destroy_ca(struct SoundIoPrivate *si, struct SoundIoInStreamPrivate *is) {
     struct SoundIoInStreamCoreAudioIOS *isca = &is->backend_data.coreaudio_ios;
-    struct SoundIoInStream *instream = &is->pub;
-    struct SoundIoDevice *device = instream->device;
-    struct SoundIoDevicePrivate *dev = (struct SoundIoDevicePrivate *)device;
-    struct SoundIoDeviceCoreAudioIOS *dca = &dev->backend_data.coreaudio_ios;
+//    struct SoundIoInStream *instream = &is->pub;
+//    struct SoundIoDevice *device = instream->device;
+//    struct SoundIoDevicePrivate *dev = (struct SoundIoDevicePrivate *)device;
+//    struct SoundIoDeviceCoreAudioIOS *dca = &dev->backend_data.coreaudio_ios;
 
     if (isca->instance) {
         AudioOutputUnitStop(isca->instance);

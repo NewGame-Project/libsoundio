@@ -96,7 +96,7 @@ else()
     set(ALSA_LIBRARIES "")
 endif()
 
-if(SOUNDIO_ENABLE_COREAUDIO)
+if(SOUNDIO_ENABLE_COREAUDIO AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     find_package(COREAUDIO)
     if(COREAUDIO_FOUND)
         set(STATUS_COREAUDIO "OK")
@@ -128,16 +128,9 @@ endif()
 if(SOUNDIO_ENABLE_COREAUDIO_IOS AND CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(STATUS_COREAUDIO_IOS "OK")
     set(SOUNDIO_HAVE_COREAUDIO_IOS true)
-
-    find_path(AUDIOUNIT_INCLUDE_DIR NAMES AudioUnit.h)
-    find_library(AUDIOUNIT_LIBRARY NAMES AudioUnit)
-    include_directories(${AUDIOUNIT_INCLUDE_DIR})
 else()
     set(STATUS_COREAUDIO_IOS "disabled")
     set(SOUNDIO_HAVE_COREAUDIO_IOS false)
-    set(COREAUDIO_LIBRARY "")
-    set(COREFOUNDATION_LIBRARY "")
-    set(AUDIOUNIT_LIBRARY "")
 endif ()
 
 if(SOUNDIO_ENABLE_WASAPI)
@@ -193,18 +186,18 @@ if(SOUNDIO_HAVE_COREAUDIO)
     )
 endif()
 if(SOUNDIO_HAVE_COREAUDIO_IOS)
+    set(LIBSOUNDIO_HEADERS ${LIBSOUNDIO_HEADERS}
+            "${libsoundio_SOURCE_DIR}/src/soundio_internal.h"
+            "${libsoundio_SOURCE_DIR}/src/soundio_private.h"
+    )
     set(LIBSOUNDIO_SOURCES ${LIBSOUNDIO_SOURCES} ${LIBSOUNDIO_HEADERS} ${CONFIGURE_OUT_FILE}
             "${libsoundio_SOURCE_DIR}/src/coreaudio_ios.h"
             "${libsoundio_SOURCE_DIR}/src/coreaudio_ios.m"
     )
 
-    find_library(AVFOUNDATION_FRAMEWORK AVFoundation REQUIRED)
     find_library(AUDIOTOOLBOX_FRAMEWORK AudioToolbox REQUIRED)
-    find_library(COREAUDIO_FRAMEWORK CoreAudio REQUIRED)
     set(LIBSOUNDIO_EXTEN_INCLUDE_LIB ${LIBSOUNDIO_EXTEN_INCLUDE_LIB}
-            ${AVFOUNDATION_FRAMEWORK}
             ${AUDIOTOOLBOX_FRAMEWORK}
-            ${COREAUDIO_FRAMEWORK}
         )
 
 endif()
