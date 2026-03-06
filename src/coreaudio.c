@@ -134,7 +134,7 @@ static void unsubscribe_device_listeners(struct SoundIoPrivate *si) {
     }
     SoundIoListAudioDeviceID_clear(&sica->registered_listeners);
 }
-
+	
 static void destroy_ca(struct SoundIoPrivate *si) {
     struct SoundIoCoreAudio *sica = &si->backend_data.coreaudio;
 
