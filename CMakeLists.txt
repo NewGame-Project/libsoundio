@@ -35,6 +35,7 @@ option(SOUNDIO_ENABLE_JACK "Enable JACK backend" OFF)
 option(SOUNDIO_ENABLE_PULSEAUDIO "Enable PulseAudio backend" OFF)
 option(SOUNDIO_ENABLE_ALSA "Enable ALSA backend" ON)
 option(SOUNDIO_ENABLE_COREAUDIO "Enable CoreAudio backend" ON)
+option(SOUNDIO_ENABLE_COREAUDIO_IOS "Enable CoreAudio iOS backend" ON)
 option(SOUNDIO_ENABLE_WASAPI "Enable WASAPI backend" ON)
 
 find_package(Threads)
@@ -124,6 +125,36 @@ else()
     set(AUDIOUNIT_LIBRARY "")
 endif()
 
+if(SOUNDIO_ENABLE_COREAUDIO_IOS)
+    find_package(COREAUDIO_IOS)
+    if(COREAUDIO_IOS_FOUND)
+        set(STATUS_COREAUDIO_IOS "OK")
+        set(SOUNDIO_HAVE_COREAUDIO_IOS true)
+        set(COREAUDIO_LIBRARY ${COREAUDIO_IOS_LIBRARY})
+        include_directories(${COREAUDIO_IOS_INCLUDE_DIR})
+
+        find_path(COREFOUNDATION_INCLUDE_DIR NAMES CoreFoundation.h)
+        find_library(COREFOUNDATION_LIBRARY NAMES CoreFoundation)
+        include_directories(${COREFOUNDATION_INCLUDE_DIR})
+
+        find_path(AUDIOUNIT_INCLUDE_DIR NAMES AudioUnit.h)
+        find_library(AUDIOUNIT_LIBRARY NAMES AudioUnit)
+        include_directories(${AUDIOUNIT_INCLUDE_DIR})
+    else()
+        set(STATUS_COREAUDIO_IOS "not found")
+        set(SOUNDIO_HAVE_COREAUDIO false)
+        set(COREAUDIO_LIBRARY "")
+        set(COREFOUNDATION_LIBRARY "")
+        set(AUDIOUNIT_LIBRARY "")
+    endif()
+else()
+    set(STATUS_COREAUDIO_IOS "disabled")
+    set(SOUNDIO_HAVE_COREAUDIO_IOS false)
+    set(COREAUDIO_LIBRARY "")
+    set(COREFOUNDATION_LIBRARY "")
+    set(AUDIOUNIT_LIBRARY "")
+endif ()
+
 if(SOUNDIO_ENABLE_WASAPI)
     find_package(WASAPI)
     if(WASAPI_FOUND)
@@ -174,6 +205,13 @@ if(SOUNDIO_HAVE_COREAUDIO)
             "${libsoundio_SOURCE_DIR}/src/coreaudio.c"
     )
 endif()
+if(SOUNDIO_HAVE_COREAUDIO_IOS)
+    set(LIBSOUNDIO_SOURCES ${LIBSOUNDIO_SOURCES}
+            "${libsoundio_SOURCE_DIR}/src/coreaudio_ios.m"
+    )
+endif()
+
+
 if(SOUNDIO_HAVE_WASAPI)
     set(LIBSOUNDIO_SOURCES ${LIBSOUNDIO_SOURCES}
             "${libsoundio_SOURCE_DIR}/src/wasapi.c"
@@ -380,9 +418,10 @@ message(
         "System Dependencies\n"
         "-------------------\n"
         "* threads                      : ${STATUS_THREADS}\n"
-        "* JACK       (optional)        : ${STATUS_JACK}\n"
-        "* PulseAudio (optional)        : ${STATUS_PULSEAUDIO}\n"
-        "* ALSA       (optional)        : ${STATUS_ALSA}\n"
-        "* CoreAudio  (optional)        : ${STATUS_COREAUDIO}\n"
-        "* WASAPI     (optional)        : ${STATUS_WASAPI}\n"
+        "* JACK           (optional)    : ${STATUS_JACK}\n"
+        "* PulseAudio     (optional)    : ${STATUS_PULSEAUDIO}\n"
+        "* ALSA           (optional)    : ${STATUS_ALSA}\n"
+        "* CoreAudio      (optional)    : ${STATUS_COREAUDIO}\n"
+        "* CoreAudio iOS  (optional)    : ${STATUS_COREAUDIO_IOS}\n"
+        "* WASAPI         (optional)    : ${STATUS_WASAPI}\n"
 )
