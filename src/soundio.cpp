@@ -309,7 +309,7 @@ int soundio_connect(struct SoundIo* soundio)
 {
     int err = 0;
 
-    for (int i = 0; i < ARRAY_LENGTH(available_backends); i += 1)
+    for (auto i = 0; i < ARRAY_LENGTH(available_backends); i += 1)
     {
         enum SoundIoBackend backend = available_backends[i];
         err = soundio_connect_backend(soundio, backend);

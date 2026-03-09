@@ -246,7 +246,7 @@ endif ()
 
 if (SOUNDIO_HAVE_WASAPI)
     set(LIBSOUNDIO_SOURCES ${LIBSOUNDIO_SOURCES}
-            "${libsoundio_SOURCE_DIR}/src/wasapi.c"
+            "${libsoundio_SOURCE_DIR}/src/wasapi.cpp"
     )
 endif ()
 
