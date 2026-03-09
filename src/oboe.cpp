@@ -7,8 +7,6 @@
 #include "soundio_private.h"
 #include "oboe/Oboe.h"
 
-static const int kChannelCount = 2;
-
 // static const int OUTPUT_ELEMENT = 0;
 // static const int INPUT_ELEMENT = 1;
 
@@ -23,7 +21,7 @@ static void deinit_sound_io_devices_info(struct SoundIoDevicesInfo** sidi)
     {
         return;
     }
-    free(*sidi);
+    soundio_destroy_devices_info(*sidi);
     *sidi = NULL;
 }
 
@@ -65,10 +63,6 @@ static int refresh_devices(struct SoundIoPrivate* si)
         device->is_raw = false;
         device->aim = aim;
 
-        device->layout_count = 1;
-        device->layouts = &device->current_layout;
-        // device->current_layout.channel_count = aim == SoundIoDeviceAimOutput ? (int) session.outputNumberOfChannels : (int) session.inputNumberOfChannels;
-        device->current_layout.channel_count = 2; // 定死双通道
         device->format_count = 1;
         device->formats = ALLOCATE(enum SoundIoFormat, device->format_count);
 
@@ -79,7 +73,21 @@ static int refresh_devices(struct SoundIoPrivate* si)
             return SoundIoErrorNoMem;
         }
 
-        device->formats[0] = SoundIoFormatS32LE;
+        device->formats[0] = SoundIoFormatFloat32LE;
+
+        if (aim == SoundIoDeviceAimOutput)
+        {
+            device->current_layout = *soundio_channel_layout_get_builtin(SoundIoChannelLayoutIdStereo);
+        }
+        else
+        {
+            device->current_layout = *soundio_channel_layout_get_builtin(SoundIoChannelLayoutIdMono);
+        }
+
+        device->layout_count = 1;
+        device->layouts = &device->current_layout;
+
+
         // device->sample_rate_current = session.sampleRate;
         device->sample_rate_current = 0; // 系统给什么用什么
         device->sample_rate_count = 1;
@@ -88,8 +96,8 @@ static int refresh_devices(struct SoundIoPrivate* si)
         device->sample_rates[0].max = device->sample_rate_current;
 
         // device->software_latency_current = aim == SoundIoDeviceAimOutput ? session.outputLatency : session.inputLatency;
-        device->software_latency_current = 0.1; // 默认十毫秒
-        device->software_latency_min = 0.01;
+        device->software_latency_current = 0.01; // 默认十毫秒
+        device->software_latency_min = 0.001;
         device->software_latency_max = 1;
 
         struct SoundIoListDevicePtr* device_list;
@@ -230,7 +238,7 @@ static void outstream_destroy_oboe(struct SoundIoPrivate* si, struct SoundIoOutS
 
     if (oso->output_stream)
     {
-        auto* stream = oso->output_stream;
+        auto* stream = static_cast<oboe::AudioStream*>(oso->output_stream);
         stream->requestStop();
         stream->close();
         oso->output_stream = nullptr;
@@ -238,7 +246,7 @@ static void outstream_destroy_oboe(struct SoundIoPrivate* si, struct SoundIoOutS
 
     if (oso->callback)
     {
-        delete oso->callback;
+        delete static_cast<oboe_callback*>(oso->callback);
         oso->callback = nullptr;
     }
 }
@@ -266,9 +274,10 @@ static int outstream_open_oboe(struct SoundIoPrivate* si, struct SoundIoOutStrea
 
     oboe::AudioStreamBuilder builder;
     builder.setSharingMode(oboe::SharingMode::Exclusive)
+            ->setUsage(oboe::Usage::Game)
             ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
-            ->setChannelCount(kChannelCount)
             ->setFormat(oboe::AudioFormat::Float)
+            ->setChannelCount(outstream->layout.channel_count)
             ->setSampleRateConversionQuality(oboe::SampleRateConversionQuality::Medium)
             ->setDataCallback(oso->callback);
 
@@ -281,13 +290,17 @@ static int outstream_open_oboe(struct SoundIoPrivate* si, struct SoundIoOutStrea
     }
     oso->output_stream = stream;
 
-    outstream->sample_rate = stream->getHardwareSampleRate();
+    outstream->sample_rate = stream->getSampleRate();
     outstream->bytes_per_frame = stream->getBytesPerFrame();
     outstream->bytes_per_sample = stream->getBytesPerSample();
-    sdo->latency_frames = stream->calculateLatencyMillis().value();
+    sdo->latency_frames = stream->getBufferSizeInFrames();
+    if (sdo->latency_frames <= 0)
+    {
+        sdo->latency_frames = stream->getBufferCapacityInFrames();
+    }
 
+    oso->hardware_latency = static_cast<double>(sdo->latency_frames) / outstream->sample_rate;
     os->backend_data.oboe.volume = 1;
-    oso->hardware_latency = sdo->latency_frames / static_cast<double>(outstream->sample_rate);
 
     return 0;
 }
@@ -295,7 +308,7 @@ static int outstream_open_oboe(struct SoundIoPrivate* si, struct SoundIoOutStrea
 static int outstream_pause_oboe(struct SoundIoPrivate* si, struct SoundIoOutStreamPrivate* os, bool pause)
 {
     struct SoundIoOutStreamOboe* osca = &os->backend_data.oboe;
-    oboe::AudioStream* stream = static_cast<oboe::AudioStream*>(osca->output_stream);
+    oboe::AudioStream* stream = osca->output_stream;
     oboe::Result result;
     if (pause)
     {
@@ -307,11 +320,15 @@ static int outstream_pause_oboe(struct SoundIoPrivate* si, struct SoundIoOutStre
     }
     else
     {
-        result = stream->requestFlush();
-        if (result != oboe::Result::OK)
+        if (stream->getState() == oboe::StreamState::Paused)
         {
-            return SoundIoErrorStreaming;
+            result = stream->requestFlush();
+            if (result != oboe::Result::OK)
+            {
+                return SoundIoErrorStreaming;
+            }
         }
+
         result = stream->requestStart();
         if (result != oboe::Result::OK)
         {
@@ -362,6 +379,20 @@ static int outstream_get_latency_oboe(struct SoundIoPrivate* si, struct SoundIoO
                                       double* out_latency)
 {
     struct SoundIoOutStreamOboe* oso = &os->backend_data.oboe;
+
+    if (oso->output_stream)
+    {
+        auto* stream = oso->output_stream;
+        // 通过 Oboe 进行实时运算，能测算出真实物理和缓冲折叠造成的完整精确延迟。
+        auto result = stream->calculateLatencyMillis();
+        if (result.error() == oboe::Result::OK)
+        {
+            *out_latency = result.value() / 1000.0;
+            return 0;
+        }
+    }
+
+    // 后备方案：如果在未运行等状态下出现错误，则回落到初始化估算结果。
     *out_latency = oso->hardware_latency;
     return 0;
 }

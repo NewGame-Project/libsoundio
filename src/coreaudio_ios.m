@@ -50,7 +50,7 @@ static void deinit_sound_io_devices_info(struct SoundIoDevicesInfo** sidi) {
     if(*sidi == NULL){
         return;
     }
-    free(*sidi);
+    soundio_destroy_devices_info(*sidi);
     *sidi = NULL;
 }
 
@@ -88,9 +88,7 @@ static int refresh_devices(struct SoundIoPrivate *si) {
         device->is_raw = false;
         device->aim = aim;
         
-        device->layout_count = 1;
-        device->layouts = &device->current_layout;
-        device->current_layout.channel_count = aim == SoundIoDeviceAimOutput ? (int)session.outputNumberOfChannels : (int)session.inputNumberOfChannels;
+
         device->format_count = 1;
         device->formats = ALLOCATE(enum SoundIoFormat, device->format_count);
         
@@ -100,8 +98,24 @@ static int refresh_devices(struct SoundIoPrivate *si) {
             deinit_sound_io_devices_info(&devices_info);
             return SoundIoErrorNoMem;
         }
+
+        device->formats[0] = SoundIoFormatFloat32LE;
+
+        if (aim == SoundIoDeviceAimOutput)
+        {
+            device->current_layout = *soundio_channel_layout_get_builtin(SoundIoChannelLayoutIdStereo);
+        }
+        else
+        {
+            device->current_layout = *soundio_channel_layout_get_builtin(SoundIoChannelLayoutIdMono);
+        }
+
+        device->layout_count = 1;
+        device->layouts = &device->current_layout;
+        device->current_layout.channel_count = aim == SoundIoDeviceAimOutput ? (int)session.outputNumberOfChannels : (int)session.inputNumberOfChannels;
+
         
-        device->formats[0] = SoundIoFormatS32LE;
+
         device->sample_rate_current = session.sampleRate;
         device->sample_rate_count = 1;
         device->sample_rates = &dev->prealloc_sample_rate_range;
