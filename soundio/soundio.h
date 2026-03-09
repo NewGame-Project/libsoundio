@@ -226,6 +226,7 @@ enum SoundIoBackend
     SoundIoBackendAlsa,
     SoundIoBackendCoreAudio,
     SoundIoBackendCoreAudioIOS,
+    SoundIoBackendAndroid,
     SoundIoBackendWasapi,
     SoundIoBackendDummy,
 };

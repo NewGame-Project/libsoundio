@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.9)
-project(libsoundio C)
+project(libsoundio CXX)
 set(CMAKE_MODULE_PATH ${libsoundio_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
+
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 if (CMAKE_VERSION VERSION_LESS 3.0.0)
     set(CMAKE_INSTALL_LIBDIR "lib" CACHE PATH "library install dir (lib)")
@@ -134,12 +140,18 @@ else ()
     set(SOUNDIO_HAVE_COREAUDIO_IOS false)
 endif ()
 
-if (SOUNDIO_ENABLE_OBOE)
+if (SOUNDIO_ENABLE_OBOE AND CMAKE_SYSTEM_NAME STREQUAL "Android")
+    # Build Oboe from source
+    add_subdirectory(${libsoundio_SOURCE_DIR}/third_party/oboe ${libsoundio_BINARY_DIR}/oboe)
+    # Oboe include path for libsoundio sources
+    include_directories(${libsoundio_SOURCE_DIR}/third_party/oboe/include)
     set(STATUS_OBOE "OK")
     set(SOUNDIO_HAVE_OBOE true)
+    set(OBOE_LIBRARY oboe)
 else ()
     set(STATUS_OBOE "disabled")
     set(SOUNDIO_HAVE_OBOE false)
+    set(OBOE_LIBRARY "")
 endif ()
 
 if (SOUNDIO_ENABLE_WASAPI)
@@ -158,12 +170,12 @@ endif ()
 
 
 set(LIBSOUNDIO_SOURCES
-        "${libsoundio_SOURCE_DIR}/src/soundio.c"
+        "${libsoundio_SOURCE_DIR}/src/soundio.cpp"
         "${libsoundio_SOURCE_DIR}/src/util.c"
         "${libsoundio_SOURCE_DIR}/src/os.c"
-        "${libsoundio_SOURCE_DIR}/src/dummy.c"
-        "${libsoundio_SOURCE_DIR}/src/channel_layout.c"
-        "${libsoundio_SOURCE_DIR}/src/ring_buffer.c"
+        "${libsoundio_SOURCE_DIR}/src/dummy.cpp"
+        "${libsoundio_SOURCE_DIR}/src/channel_layout.cpp"
+        "${libsoundio_SOURCE_DIR}/src/ring_buffer.cpp"
 )
 
 set(LIBSOUNDIO_EXTEN_INCLUDE_LIB "")
@@ -217,12 +229,19 @@ if (SOUNDIO_HAVE_OBOE)
     set(LIBSOUNDIO_HEADERS ${LIBSOUNDIO_HEADERS}
             "${libsoundio_SOURCE_DIR}/src/soundio_internal.h"
             "${libsoundio_SOURCE_DIR}/src/soundio_private.h"
+            "${libsoundio_SOURCE_DIR}/src/oboe_callback.h"
+            "${libsoundio_SOURCE_DIR}/src/oboe.h"
     )
 
     set(LIBSOUNDIO_SOURCES ${LIBSOUNDIO_SOURCES} ${CONFIGURE_OUT_FILE}
-            "${libsoundio_SOURCE_DIR}/src/oboe.h"
-            "${libsoundio_SOURCE_DIR}/src/oboe.m"
+            "${libsoundio_SOURCE_DIR}/src/oboe_callback.cpp"
+            "${libsoundio_SOURCE_DIR}/src/oboe.cpp"
     )
+
+    set(LIBSOUNDIO_EXTEN_INCLUDE_LIB ${LIBSOUNDIO_EXTEN_INCLUDE_LIB}
+            ${OBOE_LIBRARY}
+    )
+
 endif ()
 
 if (SOUNDIO_HAVE_WASAPI)
@@ -258,7 +277,7 @@ if (MSVC)
     set(LIBM " ")
 else ()
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Werror -pedantic")
-    set(LIB_CFLAGS "-std=c11 -fvisibility=hidden -Wall -Werror=strict-prototypes -Werror=old-style-definition -Werror=missing-prototypes -D_REENTRANT -D_POSIX_C_SOURCE=200809L -Wno-missing-braces")
+    set(LIB_CFLAGS "-fvisibility=hidden -Wall -Werror=strict-prototypes -Werror=old-style-definition -Werror=missing-prototypes -D_REENTRANT -D_POSIX_C_SOURCE=200809L -Wno-missing-braces")
     set(EXAMPLE_CFLAGS "-std=c99 -Wall")
     set(TEST_CFLAGS "${LIB_CFLAGS} -fprofile-arcs -ftest-coverage")
     set(TEST_LDFLAGS "-fprofile-arcs -ftest-coverage")
@@ -290,13 +309,16 @@ if (SOUNDIO_BUILD_DYNAMIC_LIBS)
 endif ()
 
 if (SOUNDIO_BUILD_STATIC_LIBS)
-    message(${LIB_CFLAGS})
+    add_library(libsoundio_static STATIC ${LIBSOUNDIO_SOURCES})
     set_target_properties(libsoundio_static PROPERTIES
             OUTPUT_NAME ${SOUNDIO_STATIC_LIBNAME}
             COMPILE_FLAGS ${LIB_CFLAGS}
             LINKER_LANGUAGE C
     )
     target_link_libraries(libsoundio_static PRIVATE ${LIBSOUNDIO_EXTEN_INCLUDE_LIB})
+    if (SOUNDIO_HAVE_OBOE)
+        target_link_libraries(libsoundio_static PUBLIC ${OBOE_LIBRARY})
+    endif ()
     install(TARGETS libsoundio_static DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endif ()
 
@@ -437,5 +459,6 @@ message(
         "* ALSA           (optional)    : ${STATUS_ALSA}\n"
         "* CoreAudio      (optional)    : ${STATUS_COREAUDIO}\n"
         "* CoreAudio iOS  (optional)    : ${STATUS_COREAUDIO_IOS}\n"
+        "* Oboe  (optional)             : ${STATUS_OBOE}\n"
         "* WASAPI         (optional)    : ${STATUS_WASAPI}\n"
 )
