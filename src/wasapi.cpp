@@ -14,10 +14,11 @@
 #define CINTERFACE
 #define COBJMACROS
 #define CONST_VTABLE
+
+#include <initguid.h>
 #include <audioclient.h>
 #include <endpointvolume.h>
-#include <functiondiscoverykeys_devpkey.h>
-#include <initguid.h>
+
 #include <mmdeviceapi.h>
 #include <mmreg.h>
 
@@ -26,18 +27,26 @@
 
 #include <stdio.h>
 
+#ifdef _MSC_VER
+#include <propkeydef.h>
+#endif
+
+#include <functiondiscoverykeys_devpkey.h>
+
 // Some HRESULT values are not defined by the windows headers
 #ifndef E_NOTFOUND
 #define E_NOTFOUND 0x80070490
 #endif // E_NOTFOUND
 
-#ifndef __cplusplus
+#ifdef __cplusplus
+
 // In C++ mode, IsEqualGUID() takes its arguments by reference
-#define IS_EQUAL_GUID(a, b) IsEqualGUID(*(a), *(b))
-#define IS_EQUAL_IID(a, b) IsEqualIID((a), *(b))
+#define IS_EQUAL_GUID(a, b) IsEqualGUID((a), (b))
+#define IS_EQUAL_IID(a, b) IsEqualIID((a), (b))
 
 // And some constants are passed by reference
 #define IID_IAUDIOCLIENT (IID_IAudioClient)
+#define IID_IAUDIOCLIENT3 (IID_IAudioClient3)
 #define IID_IMMENDPOINT (IID_IMMEndpoint)
 #define IID_IAUDIOCLOCKADJUSTMENT (IID_IAudioClockAdjustment)
 #define IID_IAUDIOSESSIONCONTROL (IID_IAudioSessionControl)
@@ -48,9 +57,30 @@
 #define CLSID_MMDEVICEENUMERATOR (CLSID_MMDeviceEnumerator)
 #define PKEY_DEVICE_FRIENDLYNAME (PKEY_Device_FriendlyName)
 #define PKEY_AUDIOENGINE_DEVICEFORMAT (PKEY_AudioEngine_DeviceFormat)
+#define IID_IAUDIOCLOCK (IID_IAudioClock)
+#define IID_IUNKNOWN (IID_IUnknown)
+#define IID_IMMNOTFICATION_CLIENT (IID_IMMNotificationClient)
 
+#ifdef _MSC_VER
 // And some GUID are never implemented (Ignoring the INITGUID define)
 static const CLSID CLSID_MMDeviceEnumerator = __uuidof(MMDeviceEnumerator);
+
+// MIDL_INTERFACE("7ED4EE07-8E67-4CD4-8C1A-2B7A5987AD42")
+static const IID IID_IAudioClient3 = {
+    0x7ed4ee07,
+    0x8e67,
+    0x4cd4,
+    {0x8c, 0x1a, 0x2b, 0x7a, 0x59, 0x87, 0xad, 0x42}
+};
+
+// MIDL_INTERFACE("CD63314F-3FBA-4a1b-812C-EF96358728E7")
+static const IID IID_IAudioClock = {
+    0xcd63314f,
+    0x3fba,
+    0x4a1b,
+    {0x81, 0x2c, 0xef, 0x96, 0x35, 0x87, 0x28, 0xe7}
+};
+
 static const IID IID_IMMDeviceEnumerator = {
     // MIDL_INTERFACE("A95664D2-9614-4F35-A746-DE8DB63617E6")
     0xa95664d2,
@@ -121,11 +151,11 @@ static const IID IID_ISimpleAudioVolume = {
     0x44e5,
     {0x92, 0x15, 0x6d, 0xa4, 0x7e, 0xf8, 0x83, 0xd8}
 };
+#endif
 
 #else
 #define IS_EQUAL_GUID(a, b) IsEqualGUID((a), (b))
 #define IS_EQUAL_IID(a, b) IsEqualIID((a), (b))
-
 #define IID_IAUDIOCLIENT IID_IAudioClient
 #define IID_IAUDIOCLIENT3 IID_IAudioClient3
 #define IID_IMMENDPOINT IID_IMMEndpoint
@@ -141,8 +171,6 @@ static const IID IID_ISimpleAudioVolume = {
 #define IID_ISIMPLEAUDIOVOLUME IID_ISimpleAudioVolume
 #define IID_IUNKNOWN IID_IUnknown
 #define IID_IMMNOTFICATION_CLIENT IID_IMMNotificationClient
-
-
 #endif
 
 // Attempting to use the Windows-supplied versions of these constants resulted
@@ -2645,7 +2673,10 @@ static inline struct SoundIoPrivate* soundio_MMNotificationClient_si(IMMNotifica
 
 static STDMETHODIMP soundio_MMNotificationClient_QueryInterface(IMMNotificationClient* client, REFIID riid, void** ppv)
 {
-    if (IS_EQUAL_IID(riid, IID_IUNKNOWN) || IS_EQUAL_IID(riid, IID_IMMNOTFICATION_CLIENT))
+    if (IS_EQUAL_IID(riid, IID_IUNKNOWN)
+        ||
+        IS_EQUAL_IID(riid, IID_IMMNOTFICATION_CLIENT)
+    )
     {
         *ppv = client;
         IUnknown_AddRef(client);
