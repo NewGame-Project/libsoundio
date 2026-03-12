@@ -326,6 +326,7 @@ struct SoundIoSampleRateRange
     int max;
 };
 
+
 /// The size of this struct is OK to use.
 struct SoundIoChannelArea
 {
@@ -334,70 +335,6 @@ struct SoundIoChannelArea
     /// How many bytes it takes to get from the beginning of one sample to
     /// the beginning of the next sample.
     int step;
-};
-
-/// The size of this struct is not part of the API or ABI.
-struct SoundIo
-{
-    /// Optional. Put whatever you want here. Defaults to NULL.
-    void* userdata;
-
-    /// Optional callback. Called when the list of devices change. Only called
-    /// during a call to ::soundio_flush_events or ::soundio_wait_events.
-    void (*on_devices_change)(struct SoundIo*);
-
-    /// Optional callback. Called when the backend disconnects. For example,
-    /// when the JACK server shuts down. When this happens, listing devices
-    /// and opening streams will always fail with
-    /// SoundIoErrorBackendDisconnected. This callback is only called during a
-    /// call to ::soundio_flush_events or ::soundio_wait_events.
-    /// If you do not supply a callback, the default will crash your program
-    /// with an error message. This callback is also called when the thread
-    /// that retrieves device information runs into an unrecoverable condition
-    /// such as running out of memory.
-    ///
-    /// Possible errors:
-    /// * #SoundIoErrorBackendDisconnected
-    /// * #SoundIoErrorNoMem
-    /// * #SoundIoErrorSystemResources
-    /// * #SoundIoErrorOpeningDevice - unexpected problem accessing device
-    ///   information
-    void (*on_backend_disconnect)(struct SoundIo*, int err);
-
-    /// Optional callback. Called from an unknown thread that you should not use
-    /// to call any soundio functions. You may use this to signal a condition
-    /// variable to wake up. Called when ::soundio_wait_events would be woken up.
-    void (*on_events_signal)(struct SoundIo*);
-
-    /// Read-only. After calling ::soundio_connect or ::soundio_connect_backend,
-    /// this field tells which backend is currently connected.
-    enum SoundIoBackend current_backend;
-
-    /// Optional: Application name.
-    /// PulseAudio uses this for "application name".
-    /// JACK uses this for `client_name`.
-    /// Must not contain a colon (":").
-    const char* app_name;
-
-    /// Optional: Real time priority warning.
-    /// This callback is fired when making thread real-time priority failed. By
-    /// default, it will print to stderr only the first time it is called
-    /// a message instructing the user how to configure their system to allow
-    /// real-time priority threads. This must be set to a function not NULL.
-    /// To silence the warning, assign this to a function that does nothing.
-    void (*emit_rtprio_warning)(void);
-
-    /// Optional: JACK info callback.
-    /// By default, libsoundio sets this to an empty function in order to
-    /// silence stdio messages from JACK. You may override the behavior by
-    /// setting this to `NULL` or providing your own function. This is
-    /// registered with JACK regardless of whether ::soundio_connect_backend
-    /// succeeds.
-    void (*jack_info_callback)(const char* msg);
-
-    /// Optional: JACK error callback.
-    /// See SoundIo::jack_info_callback
-    void (*jack_error_callback)(const char* msg);
 };
 
 /// The size of this struct is not part of the API or ABI.
@@ -703,6 +640,74 @@ struct SoundIoInStream
     /// to an error code. Possible error codes are: #SoundIoErrorIncompatibleDevice
     int layout_error;
 };
+
+
+/// The size of this struct is not part of the API or ABI.
+struct SoundIo
+{
+    /// Optional. Put whatever you want here. Defaults to NULL.
+    void* userdata;
+
+    struct SoundIoOutStream* out_stream;
+
+    /// Optional callback. Called when the list of devices change. Only called
+    /// during a call to ::soundio_flush_events or ::soundio_wait_events.
+    void (*on_devices_change)(struct SoundIo*);
+
+    /// Optional callback. Called when the backend disconnects. For example,
+    /// when the JACK server shuts down. When this happens, listing devices
+    /// and opening streams will always fail with
+    /// SoundIoErrorBackendDisconnected. This callback is only called during a
+    /// call to ::soundio_flush_events or ::soundio_wait_events.
+    /// If you do not supply a callback, the default will crash your program
+    /// with an error message. This callback is also called when the thread
+    /// that retrieves device information runs into an unrecoverable condition
+    /// such as running out of memory.
+    ///
+    /// Possible errors:
+    /// * #SoundIoErrorBackendDisconnected
+    /// * #SoundIoErrorNoMem
+    /// * #SoundIoErrorSystemResources
+    /// * #SoundIoErrorOpeningDevice - unexpected problem accessing device
+    ///   information
+    void (*on_backend_disconnect)(struct SoundIo*, int err);
+
+    /// Optional callback. Called from an unknown thread that you should not use
+    /// to call any soundio functions. You may use this to signal a condition
+    /// variable to wake up. Called when ::soundio_wait_events would be woken up.
+    void (*on_events_signal)(struct SoundIo*);
+
+    /// Read-only. After calling ::soundio_connect or ::soundio_connect_backend,
+    /// this field tells which backend is currently connected.
+    enum SoundIoBackend current_backend;
+
+    /// Optional: Application name.
+    /// PulseAudio uses this for "application name".
+    /// JACK uses this for `client_name`.
+    /// Must not contain a colon (":").
+    const char* app_name;
+
+    /// Optional: Real time priority warning.
+    /// This callback is fired when making thread real-time priority failed. By
+    /// default, it will print to stderr only the first time it is called
+    /// a message instructing the user how to configure their system to allow
+    /// real-time priority threads. This must be set to a function not NULL.
+    /// To silence the warning, assign this to a function that does nothing.
+    void (*emit_rtprio_warning)(void);
+
+    /// Optional: JACK info callback.
+    /// By default, libsoundio sets this to an empty function in order to
+    /// silence stdio messages from JACK. You may override the behavior by
+    /// setting this to `NULL` or providing your own function. This is
+    /// registered with JACK regardless of whether ::soundio_connect_backend
+    /// succeeds.
+    void (*jack_info_callback)(const char* msg);
+
+    /// Optional: JACK error callback.
+    /// See SoundIo::jack_info_callback
+    void (*jack_error_callback)(const char* msg);
+};
+
 
 /// See also ::soundio_version_major, ::soundio_version_minor, ::soundio_version_patch
 SOUNDIO_EXPORT const char* soundio_version_string(void);

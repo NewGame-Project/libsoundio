@@ -1234,8 +1234,7 @@ static void device_thread_run(void* arg)
         return;
     }
 
-    if (FAILED(hr = IMMDeviceEnumerator_RegisterEndpointNotificationCallback(siw->device_enumerator,
-        &siw->device_events)))
+    if (FAILED(hr = IMMDeviceEnumerator_RegisterEndpointNotificationCallback(siw->device_enumerator, siw->device_events)))
     {
         shutdown_backend(si, SoundIoErrorSystemResources);
         return;
@@ -1263,7 +1262,7 @@ static void device_thread_run(void* arg)
     }
     soundio_os_mutex_unlock(siw->scan_devices_mutex);
 
-    IMMDeviceEnumerator_UnregisterEndpointNotificationCallback(siw->device_enumerator, &siw->device_events);
+    IMMDeviceEnumerator_UnregisterEndpointNotificationCallback(siw->device_enumerator, siw->device_events);
     IMMDeviceEnumerator_Release(siw->device_enumerator);
     siw->device_enumerator = NULL;
 }
@@ -1418,12 +1417,18 @@ static IAudioClient3* open_audio_client3(struct SoundIoOutStreamPrivate* os, WAV
             IUnknown_Release(audio_client3);
             return NULL;
         }
-        // we can't use resampling with this new interface, fallback to old method
+
+        auto need_resample = mix_format->Format.nSamplesPerSec != outstream->sample_rate;
+        if (need_resample)
+        {
+            // we can't use resampling with this new interface, fallback to old method
+            CoTaskMemFree(mix_format);
+            IUnknown_Release(audio_client3);
+            return NULL;
+        }
+
         wave_format->Format.nSamplesPerSec = mix_format->Format.nSamplesPerSec;
-        outstream->sample_rate = mix_format->Format.nSamplesPerSec;
-        // osw->need_resample = mix_format->Format.nSamplesPerSec != outstream->sample_rate;
         CoTaskMemFree(mix_format);
-        mix_format = NULL;
     }
 
     return audio_client3;
@@ -1453,9 +1458,9 @@ static IAudioClient* open_audio_client(struct SoundIoOutStreamPrivate* os, WAVEF
             IUnknown_Release(audio_client);
             return NULL;
         }
-        wave_format->Format.nSamplesPerSec = mix_format->Format.nSamplesPerSec;
-        outstream->sample_rate = mix_format->Format.nSamplesPerSec;
-        // osw->need_resample = mix_format->Format.nSamplesPerSec != outstream->sample_rate;
+        // wave_format->Format.nSamplesPerSec = mix_format->Format.nSamplesPerSec;
+        // outstream->sample_rate = mix_format->Format.nSamplesPerSec;
+        osw->need_resample = mix_format->Format.nSamplesPerSec != outstream->sample_rate;
         CoTaskMemFree(mix_format);
         mix_format = NULL;
     }
@@ -1489,12 +1494,18 @@ static int Initialize(IAudioClient** audio_client, IAudioClient3** audio_client3
     struct SoundIoOutStreamWasapi* osw = &os->backend_data.wasapi;
     struct SoundIoOutStream* outstream = &os->pub;
     struct SoundIoDevice* device = outstream->device;
-    struct SoundIoDevicePrivate* dev = (struct SoundIoDevicePrivate*) device;
+    struct SoundIoDevicePrivate* dev = reinterpret_cast<struct SoundIoDevicePrivate*>(device);
     struct SoundIoDeviceWasapi* dw = &dev->backend_data.wasapi;
     HRESULT hr;
 
-    if (audio_client3 != NULL)
+    if (*audio_client3 != NULL)
     {
+        if (osw->need_resample)
+        {
+            deinit_client3_and_callback(audio_client3, audio_client, os, wave_format);
+            goto NEXT;
+        }
+
         WAVEFORMATEXTENSIBLE* mix_format;
         if (FAILED(hr = IAudioClient_GetMixFormat(*audio_client3, (WAVEFORMATEX **) &mix_format)))
         {
@@ -1508,8 +1519,7 @@ static int Initialize(IAudioClient** audio_client, IAudioClient3** audio_client3
         UINT32 min_period;
         UINT32 max_period;
 
-        if (FAILED(hr = IAudioClient3_GetSharedModeEnginePeriod(*audio_client3, &mix_format->Format, &default_period,
-            &fundamental_period, &min_period, &max_period)))
+        if (FAILED(hr = IAudioClient3_GetSharedModeEnginePeriod(*audio_client3, &mix_format->Format, &default_period, &fundamental_period, &min_period, &max_period)))
         {
             deinit_mix_format(&mix_format);
         }
@@ -1517,14 +1527,11 @@ static int Initialize(IAudioClient** audio_client, IAudioClient3** audio_client3
         UINT32 periodicity_in_frames = default_period;
         if (outstream->software_latency < 1.0)
         {
-            periodicity_in_frames = fundamental_period * (UINT32) (mix_format->Format.nSamplesPerSec *
-                                                                   outstream->software_latency / fundamental_period);
+            periodicity_in_frames = fundamental_period * (UINT32) (mix_format->Format.nSamplesPerSec * outstream->software_latency / fundamental_period);
             periodicity_in_frames = soundio_uint_clamp(min_period, periodicity_in_frames, max_period);
         }
 
-        if (!osw->need_resample &&
-            SUCCEEDED(hr = IAudioClient3_InitializeSharedAudioStream(*audio_client3, flags, periodicity_in_frames,
-                (WAVEFORMATEX *) wave_format, NULL)))
+        if (!osw->need_resample && SUCCEEDED(hr = IAudioClient3_InitializeSharedAudioStream(*audio_client3, flags, periodicity_in_frames, (WAVEFORMATEX *) wave_format, NULL)))
         {
             deinit_mix_format(&mix_format);
             return SoundIoErrorNone;
@@ -1532,8 +1539,7 @@ static int Initialize(IAudioClient** audio_client, IAudioClient3** audio_client3
     }
 
 NEXT:
-    if (FAILED(hr = IAudioClient_Initialize(*audio_client, share_mode, flags, buffer_duration, periodicity,
-        (WAVEFORMATEX *) wave_format, NULL)))
+    if (FAILED(hr = IAudioClient_Initialize(*audio_client, share_mode, flags, buffer_duration, periodicity, (WAVEFORMATEX *) wave_format, NULL)))
     {
         if (hr == AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED)
         {
@@ -1661,7 +1667,17 @@ static int outstream_do_open(struct SoundIoPrivate* si, struct SoundIoOutStreamP
     }
     else
     {
-        flags = (osw->need_resample ? AUDCLNT_STREAMFLAGS_RATEADJUST : 0) | AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
+        if (osw->need_resample)
+        {
+            flags = AUDCLNT_STREAMFLAGS_RATEADJUST |
+                    AUDCLNT_STREAMFLAGS_EVENTCALLBACK |
+                    AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM |
+                    AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
+        }
+        else
+        {
+            flags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
+        }
         share_mode = AUDCLNT_SHAREMODE_SHARED;
         periodicity = 0;
         buffer_duration = 0;
@@ -1671,8 +1687,7 @@ static int outstream_do_open(struct SoundIoPrivate* si, struct SoundIoOutStreamP
     to_wave_format_format(outstream->format, &wave_format);
     complete_wave_format_data(&wave_format);
 
-    int soundIoError = Initialize(&audio_client, &audio_client3, os, &wave_format, flags, share_mode, buffer_duration,
-                                  periodicity);
+    int soundIoError = Initialize(&audio_client, &audio_client3, os, &wave_format, flags, share_mode, buffer_duration, periodicity);
     if (soundIoError > 0)
     {
         return soundIoError;
@@ -1704,21 +1719,20 @@ static int outstream_do_open(struct SoundIoPrivate* si, struct SoundIoOutStreamP
 
     if (osw->need_resample)
     {
-        if (FAILED(hr = IAudioClient_GetService(audio_client, IID_IAUDIOCLOCKADJUSTMENT,
-            (void **) &osw->audio_clock_adjustment)))
+        if (FAILED(hr = IAudioClient_GetService(audio_client, IID_IAUDIOCLOCKADJUSTMENT, (void **) &osw->audio_clock_adjustment)))
         {
             return SoundIoErrorOpeningDevice;
         }
-        if (FAILED(hr = IAudioClockAdjustment_SetSampleRate(osw->audio_clock_adjustment, outstream->sample_rate)))
-        {
-            return SoundIoErrorOpeningDevice;
-        }
+
+        // if (FAILED(hr = IAudioClockAdjustment_SetSampleRate(osw->audio_clock_adjustment, outstream->sample_rate)))
+        // {
+        //     return SoundIoErrorOpeningDevice;
+        // }
     }
 
     if (outstream->name)
     {
-        if (FAILED(hr = IAudioClient_GetService(audio_client, IID_IAUDIOSESSIONCONTROL,
-            (void **) &osw->audio_session_control)))
+        if (FAILED(hr = IAudioClient_GetService(audio_client, IID_IAUDIOSESSIONCONTROL, reinterpret_cast<void**>(&osw->audio_session_control))))
         {
             return SoundIoErrorOpeningDevice;
         }
@@ -2633,6 +2647,7 @@ static int instream_get_latency_wasapi(struct SoundIoPrivate* si, struct SoundIo
     return 0;
 }
 
+static soundio_NotificationClient* notificationClient;
 
 static void destroy_wasapi(struct SoundIoPrivate* si)
 {
@@ -2660,26 +2675,30 @@ static void destroy_wasapi(struct SoundIoPrivate* si)
         soundio_os_mutex_destroy(siw->mutex);
 
     soundio_destroy_devices_info(siw->ready_devices_info);
+    if (notificationClient)
+    {
+        delete notificationClient;
+        notificationClient = nullptr;
+    }
 }
 
-static inline struct SoundIoPrivate* soundio_MMNotificationClient_si(IMMNotificationClient* client)
-{
-    struct SoundIoWasapi* siw =
-            (struct SoundIoWasapi*) (((char*) client) - offsetof(struct SoundIoWasapi, device_events));
-    struct SoundIoPrivate* si =
-            (struct SoundIoPrivate*) (((char*) siw) - offsetof(struct SoundIoPrivate, backend_data));
-    return si;
-}
 
-static STDMETHODIMP soundio_MMNotificationClient_QueryInterface(IMMNotificationClient* client, REFIID riid, void** ppv)
+// static inline struct SoundIoPrivate* soundio_MMNotificationClient_si(soundio_NotificationClient* client)
+// {
+//     struct SoundIoWasapi* siw = (struct SoundIoWasapi*) (((char*) client) - offsetof(struct SoundIoWasapi, device_events));
+//     struct SoundIoPrivate* si = (struct SoundIoPrivate*) (((char*) siw) - offsetof(struct SoundIoPrivate, backend_data));
+//     return si;
+// }
+
+STDMETHODIMP soundio_NotificationClient::QueryInterface(REFIID riid, void** ppv)
 {
     if (IS_EQUAL_IID(riid, IID_IUNKNOWN)
         ||
         IS_EQUAL_IID(riid, IID_IMMNOTFICATION_CLIENT)
     )
     {
-        *ppv = client;
-        IUnknown_AddRef(client);
+        *ppv = this;
+        IUnknown_AddRef(this);
         return S_OK;
     }
     else
@@ -2689,66 +2708,59 @@ static STDMETHODIMP soundio_MMNotificationClient_QueryInterface(IMMNotificationC
     }
 }
 
-static STDMETHODIMP_(ULONG) soundio_MMNotificationClient_AddRef(IMMNotificationClient* client)
+STDMETHODIMP_(ULONG) soundio_NotificationClient::AddRef()
 {
-    struct SoundIoPrivate* si = soundio_MMNotificationClient_si(client);
     struct SoundIoWasapi* siw = &si->backend_data.wasapi;
     return InterlockedIncrement(&siw->device_events_refs);
 }
 
-static STDMETHODIMP_(ULONG) soundio_MMNotificationClient_Release(IMMNotificationClient* client)
+STDMETHODIMP_(ULONG) soundio_NotificationClient::Release()
 {
-    struct SoundIoPrivate* si = soundio_MMNotificationClient_si(client);
     struct SoundIoWasapi* siw = &si->backend_data.wasapi;
     return InterlockedDecrement(&siw->device_events_refs);
 }
 
-static HRESULT queue_device_scan(IMMNotificationClient* client)
+static HRESULT queue_device_scan(soundio_NotificationClient* client)
 {
-    struct SoundIoPrivate* si = soundio_MMNotificationClient_si(client);
-    force_device_scan_wasapi(si);
+    force_device_scan_wasapi(client->si);
     return S_OK;
 }
 
-static STDMETHODIMP soundio_MMNotificationClient_OnDeviceStateChanged(IMMNotificationClient* client, LPCWSTR wid,
-                                                                      DWORD state)
+STDMETHODIMP soundio_NotificationClient::OnDeviceStateChanged(LPCWSTR wid, DWORD state)
 {
-    return queue_device_scan(client);
+    return queue_device_scan(this);
 }
 
-static STDMETHODIMP soundio_MMNotificationClient_OnDeviceAdded(IMMNotificationClient* client, LPCWSTR wid)
+STDMETHODIMP soundio_NotificationClient::OnDeviceAdded(LPCWSTR wid)
 {
-    return queue_device_scan(client);
+    return queue_device_scan(this);
 }
 
-static STDMETHODIMP soundio_MMNotificationClient_OnDeviceRemoved(IMMNotificationClient* client, LPCWSTR wid)
+STDMETHODIMP soundio_NotificationClient::OnDeviceRemoved(LPCWSTR wid)
 {
-    return queue_device_scan(client);
+    return queue_device_scan(this);
 }
 
-static STDMETHODIMP soundio_MMNotificationClient_OnDefaultDeviceChange(IMMNotificationClient* client, EDataFlow flow,
-                                                                       ERole role, LPCWSTR wid)
+STDMETHODIMP soundio_NotificationClient::OnDefaultDeviceChanged(EDataFlow flow, ERole role, LPCWSTR wid)
 {
-    return queue_device_scan(client);
+    if (role != eConsole)
+    {
+        return S_OK;
+    }
+
+    auto result = queue_device_scan(this);
+    struct SoundIoOutStreamPrivate* os = reinterpret_cast<SoundIoOutStreamPrivate*>(si->pub.out_stream);
+    outstream_destroy_wasapi(si, os);
+    outstream_open_wasapi(si, os);
+
+    return result;
 }
 
-static STDMETHODIMP soundio_MMNotificationClient_OnPropertyValueChanged(IMMNotificationClient* client, LPCWSTR wid,
-                                                                        const PROPERTYKEY key)
+STDMETHODIMP soundio_NotificationClient::OnPropertyValueChanged(LPCWSTR wid, const PROPERTYKEY key)
 {
-    return queue_device_scan(client);
+    return queue_device_scan(this);
 }
 
-
-static struct IMMNotificationClientVtbl soundio_MMNotificationClient = {
-    soundio_MMNotificationClient_QueryInterface,
-    soundio_MMNotificationClient_AddRef,
-    soundio_MMNotificationClient_Release,
-    soundio_MMNotificationClient_OnDeviceStateChanged,
-    soundio_MMNotificationClient_OnDeviceAdded,
-    soundio_MMNotificationClient_OnDeviceRemoved,
-    soundio_MMNotificationClient_OnDefaultDeviceChange,
-    soundio_MMNotificationClient_OnPropertyValueChanged,
-};
 
 int soundio_wasapi_init(struct SoundIoPrivate* si)
 {
@@ -2785,14 +2797,18 @@ int soundio_wasapi_init(struct SoundIoPrivate* si)
         return SoundIoErrorNoMem;
     }
 
-    siw->device_events.lpVtbl = &soundio_MMNotificationClient;
-    siw->device_events_refs = 1;
+    // siw->device_events.lpVtbl = &soundio_MMNotificationClient;
+
 
     if ((err = soundio_os_thread_create(device_thread_run, si, NULL, &siw->thread)))
     {
         destroy_wasapi(si);
         return err;
     }
+
+    notificationClient = new soundio_NotificationClient(si);
+    siw->device_events_refs = 1;
+    siw->device_events = notificationClient;
 
     si->destroy = destroy_wasapi;
     si->flush_events = flush_events_wasapi;

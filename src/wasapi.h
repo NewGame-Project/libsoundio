@@ -38,25 +38,6 @@ struct SoundIoDeviceWasapi
     IMMDevice* mm_device;
 };
 
-struct SoundIoWasapi
-{
-    struct SoundIoOsMutex* mutex;
-    struct SoundIoOsCond* cond;
-    struct SoundIoOsCond* scan_devices_cond;
-    struct SoundIoOsMutex* scan_devices_mutex;
-    struct SoundIoOsThread* thread;
-    bool abort_flag;
-    // this one is ready to be read with flush_events. protected by mutex
-    struct SoundIoDevicesInfo* ready_devices_info;
-    bool have_devices_flag;
-    bool device_scan_queued;
-    int shutdown_err;
-    bool emitted_shutdown_cb;
-
-    IMMDeviceEnumerator* device_enumerator;
-    IMMNotificationClient device_events;
-    LONG device_events_refs;
-};
 
 struct SoundIoOutStreamWasapi
 {
@@ -115,6 +96,60 @@ struct SoundIoInStreamWasapi
     int opened_buf_frames;
     struct SoundIoChannelArea areas[SOUNDIO_MAX_CHANNELS];
 };
+
+class soundio_NotificationClient;
+
+struct SoundIoWasapi
+{
+    struct SoundIoOsMutex* mutex;
+    struct SoundIoOsCond* cond;
+    struct SoundIoOsCond* scan_devices_cond;
+    struct SoundIoOsMutex* scan_devices_mutex;
+    struct SoundIoOsThread* thread;
+    bool abort_flag;
+    // this one is ready to be read with flush_events. protected by mutex
+    struct SoundIoDevicesInfo* ready_devices_info;
+    bool have_devices_flag;
+    bool device_scan_queued;
+    int shutdown_err;
+    bool emitted_shutdown_cb;
+
+    IMMDeviceEnumerator* device_enumerator;
+    soundio_NotificationClient* device_events;
+    LONG device_events_refs;
+};
+
+class soundio_NotificationClient : public IMMNotificationClient
+{
+    LONG _cRef{1};
+
+public:
+    SoundIoPrivate* si;
+
+    soundio_NotificationClient(SoundIoPrivate* si)
+    {
+        this->si = si;
+    }
+
+    IFACEMETHODIMP QueryInterface(REFIID riid, void** ppv);
+
+    IFACEMETHODIMP_(ULONG) AddRef();
+
+    IFACEMETHODIMP_(ULONG) Release();
+
+    // IMMNotificationClient methods
+    IFACEMETHODIMP OnDeviceStateChanged(LPCWSTR pwstrDeviceId, DWORD dwNewState);
+
+    IFACEMETHODIMP OnDeviceAdded(LPCWSTR pwstrDeviceId);
+
+    IFACEMETHODIMP OnDeviceRemoved(LPCWSTR pwstrDeviceId);
+
+    IFACEMETHODIMP OnDefaultDeviceChanged(EDataFlow flow, ERole role, LPCWSTR pwstrDeviceId);
+
+    IFACEMETHODIMP OnPropertyValueChanged(LPCWSTR pwstrDeviceId, const PROPERTYKEY key);
+};
+
+
 #ifdef __cplusplus
 }
 #endif
