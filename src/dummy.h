@@ -20,8 +20,8 @@ int soundio_dummy_init(std::shared_ptr<SoundIoPrivate> si);
 
 struct SoundIoDummy
 {
-    std::shared_ptr<SoundIoOsMutex> mutex;
-    std::shared_ptr<SoundIoOsCond> cond;
+    std::unique_ptr<SoundIoOsMutex> mutex;
+    std::unique_ptr<SoundIoOsCond> cond;
     bool devices_emitted;
 };
 
@@ -32,14 +32,14 @@ struct SoundIoDeviceDummy
 
 struct SoundIoOutStreamDummy
 {
-    std::shared_ptr<SoundIoOsThread> thread;
-    std::shared_ptr<SoundIoOsCond> cond;
+    std::unique_ptr<SoundIoOsThread> thread;
+    std::unique_ptr<SoundIoOsCond> cond;
     struct SoundIoAtomicFlag abort_flag;
     double period_duration;
     int buffer_frame_count;
     int frames_left;
     int write_frame_count;
-    std::shared_ptr<SoundIoRingBuffer> ring_buffer;
+    std::unique_ptr<SoundIoRingBuffer> ring_buffer;
     double playback_start_time;
     struct SoundIoAtomicFlag clear_buffer_flag;
     struct SoundIoAtomicBool pause_requested;
@@ -48,14 +48,14 @@ struct SoundIoOutStreamDummy
 
 struct SoundIoInStreamDummy
 {
-    std::shared_ptr<SoundIoOsThread> thread;
-    std::shared_ptr<SoundIoOsCond> cond;
+    std::unique_ptr<SoundIoOsThread> thread;
+    std::unique_ptr<SoundIoOsCond> cond;
     struct SoundIoAtomicFlag abort_flag;
     double period_duration;
     int frames_left;
     int read_frame_count;
     int buffer_frame_count;
-    std::shared_ptr<SoundIoRingBuffer> ring_buffer;
+    std::unique_ptr<SoundIoRingBuffer> ring_buffer;
     struct SoundIoAtomicBool pause_requested;
     struct SoundIoChannelArea areas[SOUNDIO_MAX_CHANNELS];
 };

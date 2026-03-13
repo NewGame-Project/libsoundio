@@ -15,25 +15,26 @@
 #endif
 
 
-std::shared_ptr<SoundIoRingBuffer> soundio_ring_buffer_create(std::shared_ptr<SoundIo> soundio, int requested_capacity)
-{
-    assert(requested_capacity > 0);
-    std::shared_ptr<SoundIoRingBuffer> rb = std::make_shared<SoundIoRingBuffer>();
-
-    if (!rb)
-    {
-        // soundio_ring_buffer_destroy(rb);
-        return NULL;
-    }
-
-    if (soundio_ring_buffer_init(rb, requested_capacity))
-    {
-        // soundio_ring_buffer_destroy(rb);
-        return NULL;
-    }
-
-    return rb;
-}
+// std::shared_ptr<SoundIoRingBuffer> soundio_ring_buffer_create(std::shared_ptr<SoundIo> soundio, int requested_capacity)
+// {
+//     assert(requested_capacity > 0);
+//     std::shared_ptr<SoundIoRingBuffer> rb = std::make_shared<SoundIoRingBuffer>();
+//
+//     if (!rb)
+//     {
+//         // soundio_ring_buffer_destroy(rb);
+//         return NULL;
+//     }
+//
+//
+//     if (rb->init(requested_capacity))
+//     {
+//         // soundio_ring_buffer_destroy(rb);
+//         return NULL;
+//     }
+//
+//     return rb;
+// }
 
 // void soundio_ring_buffer_destroy(std::shared_ptr<SoundIoRingBuffer> rb)
 // {
@@ -50,66 +51,66 @@ std::shared_ptr<SoundIoRingBuffer> soundio_ring_buffer_create(std::shared_ptr<So
 //     return rb->capacity;
 // }
 
-char* soundio_ring_buffer_write_ptr(std::shared_ptr<SoundIoRingBuffer> rb)
-{
-    unsigned long write_offset = SOUNDIO_ATOMIC_LOAD(rb->write_offset);
-    return rb->mem->address.get() + (write_offset % rb->capacity());
-}
+// char* soundio_ring_buffer_write_ptr(std::shared_ptr<SoundIoRingBuffer> rb)
+// {
+//     unsigned long write_offset = SOUNDIO_ATOMIC_LOAD(rb->write_offset);
+//     return rb->mem->address.get() + (write_offset % rb->capacity());
+// }
 
-void soundio_ring_buffer_advance_write_ptr(std::shared_ptr<SoundIoRingBuffer> rb, int count)
-{
-    SOUNDIO_ATOMIC_FETCH_ADD(rb->write_offset, count);
-    assert(soundio_ring_buffer_fill_count(rb) >= 0);
-}
+// void soundio_ring_buffer_advance_write_ptr(std::shared_ptr<SoundIoRingBuffer> rb, int count)
+// {
+//     SOUNDIO_ATOMIC_FETCH_ADD(rb->write_offset, count);
+//     assert(soundio_ring_buffer_fill_count(rb) >= 0);
+// }
 
-char* soundio_ring_buffer_read_ptr(std::shared_ptr<SoundIoRingBuffer> rb)
-{
-    unsigned long read_offset = SOUNDIO_ATOMIC_LOAD(rb->read_offset);
-    return rb->mem->address.get() + (read_offset % rb->capacity());
-}
+// char* soundio_ring_buffer_read_ptr(std::shared_ptr<SoundIoRingBuffer> rb)
+// {
+//     unsigned long read_offset = SOUNDIO_ATOMIC_LOAD(rb->read_offset);
+//     return rb->mem->address.get() + (read_offset % rb->capacity());
+// }
 
-void soundio_ring_buffer_advance_read_ptr(std::shared_ptr<SoundIoRingBuffer> rb, int count)
-{
-    SOUNDIO_ATOMIC_FETCH_ADD(rb->read_offset, count);
-    assert(soundio_ring_buffer_fill_count(rb) >= 0);
-}
+// void soundio_ring_buffer_advance_read_ptr(std::shared_ptr<SoundIoRingBuffer> rb, int count)
+// {
+//     SOUNDIO_ATOMIC_FETCH_ADD(rb->read_offset, count);
+//     assert(soundio_ring_buffer_fill_count(rb) >= 0);
+// }
 
-int soundio_ring_buffer_fill_count(std::shared_ptr<SoundIoRingBuffer> rb)
-{
-    // Whichever offset we load first might have a smaller value. So we load
-    // the read_offset first.
-    unsigned long read_offset = SOUNDIO_ATOMIC_LOAD(rb->read_offset);
-    unsigned long write_offset = SOUNDIO_ATOMIC_LOAD(rb->write_offset);
-    int count = static_cast<int>(write_offset - read_offset);
-    assert(count >= 0);
-    assert(count <= rb->capacity());
-    return count;
-}
+// int soundio_ring_buffer_fill_count(std::shared_ptr<SoundIoRingBuffer> rb)
+// {
+//     // Whichever offset we load first might have a smaller value. So we load
+//     // the read_offset first.
+//     unsigned long read_offset = SOUNDIO_ATOMIC_LOAD(rb->read_offset);
+//     unsigned long write_offset = SOUNDIO_ATOMIC_LOAD(rb->write_offset);
+//     int count = static_cast<int>(write_offset - read_offset);
+//     assert(count >= 0);
+//     assert(count <= rb->capacity());
+//     return count;
+// }
 
-int soundio_ring_buffer_free_count(std::shared_ptr<SoundIoRingBuffer> rb)
-{
-    return rb->capacity() - soundio_ring_buffer_fill_count(rb);
-}
+// int soundio_ring_buffer_free_count(std::shared_ptr<SoundIoRingBuffer> rb)
+// {
+//     return rb->capacity() - soundio_ring_buffer_fill_count(rb);
+// }
+//
+// void soundio_ring_buffer_clear(std::shared_ptr<SoundIoRingBuffer> rb)
+// {
+//     unsigned long read_offset = SOUNDIO_ATOMIC_LOAD(rb->read_offset);
+//     SOUNDIO_ATOMIC_STORE(rb->write_offset, read_offset);
+// }
 
-void soundio_ring_buffer_clear(std::shared_ptr<SoundIoRingBuffer> rb)
-{
-    unsigned long read_offset = SOUNDIO_ATOMIC_LOAD(rb->read_offset);
-    SOUNDIO_ATOMIC_STORE(rb->write_offset, read_offset);
-}
 
-
-int soundio_ring_buffer_init(std::shared_ptr<SoundIoRingBuffer> rb, int requested_capacity)
-{
-    int err;
-    if ((err = soundio_os_init_mirrored_memory(rb->mem, requested_capacity)))
-    {
-        return err;
-    }
-    SOUNDIO_ATOMIC_STORE(rb->write_offset, 0);
-    SOUNDIO_ATOMIC_STORE(rb->read_offset, 0);
-
-    return 0;
-}
+// int soundio_ring_buffer_init(std::shared_ptr<SoundIoRingBuffer> rb, int requested_capacity)
+// {
+//     int err;
+//     if ((err = soundio_os_init_mirrored_memory(rb->mem, requested_capacity)))
+//     {
+//         return err;
+//     }
+//     SOUNDIO_ATOMIC_STORE(rb->write_offset, 0);
+//     SOUNDIO_ATOMIC_STORE(rb->read_offset, 0);
+//
+//     return 0;
+// }
 
 // void soundio_ring_buffer_deinit(std::shared_ptr<SoundIoRingBuffer> rb)
 // {
@@ -154,7 +155,7 @@ struct MmapDeleter
 #else
             if (ptr != MAP_FAILED)
             {
-                munmap(ptr, capacity);
+                munmap(ptr, capacity * 2);
             }
 #endif
         }
@@ -291,7 +292,6 @@ int SoundIoRingBuffer::init_mirrored_memory(int requested_capacity)
         return SoundIoErrorNoMem;
     }
 
-    actual_capacity = 2 * actual_capacity;
     mem->address = std::unique_ptr<char, std::function<void(char*)>>(address, MmapDeleter(actual_capacity, nullptr));
 
     if (close(fd))

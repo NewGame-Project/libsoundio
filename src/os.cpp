@@ -5,189 +5,13 @@
  * See http://opensource.org/licenses/MIT
  */
 
-#if defined(__APPLE__)
-#define _DARWIN_C_SOURCE
-#undef _POSIX_C_SOURCE
-#else
-#define _GNU_SOURCE
-#endif
 
 #include "os.h"
 #include "soundio_internal.h"
-#include "util.h"
 
-#include <stdlib.h>
 #include <time.h>
 #include <assert.h>
 #include <string.h>
-#include <errno.h>
-
-
-#if defined(_WIN32)
-#define SOUNDIO_OS_WINDOWS
-
-#if !defined(NOMINMAX)
-#define NOMINMAX
-#endif
-
-#if !defined(VC_EXTRALEAN)
-#define VC_EXTRALEAN
-#endif
-
-#if !defined(WIN32_LEAN_AND_MEAN)
-#define WIN32_LEAN_AND_MEAN
-#endif
-
-#if !defined(UNICODE)
-#define UNICODE
-#endif
-
-// require Windows 7 or later
-#if WINVER < 0x0601
-#undef WINVER
-#define WINVER 0x0601
-#endif
-#if _WIN32_WINNT < 0x0601
-#undef _WIN32_WINNT
-#define _WIN32_WINNT 0x0601
-#endif
-
-#include <windows.h>
-#include <mmsystem.h>
-#include <objbase.h>
-
-#else
-
-#include <pthread.h>
-#include <unistd.h>
-
-
-#include <utility>
-#if !defined(MAP_ANONYMOUS) && defined(MAP_ANON)
-#define MAP_ANONYMOUS MAP_ANON
-#endif
-
-#endif
-
-#if defined(__FreeBSD__) || defined(__MACH__)
-#define SOUNDIO_OS_KQUEUE
-#include <sys/types.h>
-#include <sys/event.h>
-#include <sys/time.h>
-#endif
-
-#if defined(__MACH__)
-#include <mach/clock.h>
-#include <mach/mach.h>
-#endif
-
-struct SoundIoOsThread
-{
-    ~SoundIoOsThread()
-    {
-#if defined(SOUNDIO_OS_WINDOWS)
-        if (handle)
-        {
-            DWORD err = WaitForSingleObject(handle, INFINITE);
-            assert(err != WAIT_FAILED);
-            BOOL ok = CloseHandle(handle);
-            assert(ok);
-        }
-#else
-
-        if (running)
-        {
-            assert(!pthread_join(id, nullptr));
-        }
-
-        if (attr_init)
-        {
-            assert(!pthread_attr_destroy(&attr));
-        }
-#endif
-    }
-
-#if defined(SOUNDIO_OS_WINDOWS)
-    HANDLE handle;
-    DWORD id;
-#else
-    pthread_attr_t attr;
-    bool attr_init;
-
-    pthread_t id;
-    bool running;
-#endif
-    std::shared_ptr<void> arg;
-
-    void (*run)(std::shared_ptr<void> arg);
-};
-
-struct SoundIoOsMutex
-{
-#if defined(SOUNDIO_OS_WINDOWS)
-    CRITICAL_SECTION id;
-#else
-    pthread_mutex_t id;
-    bool id_init;
-#endif
-    ~SoundIoOsMutex()
-    {
-#if defined(SOUNDIO_OS_WINDOWS)
-        DeleteCriticalSection(&mutex->id);
-#else
-        if (id_init)
-        {
-            assert(!pthread_mutex_destroy(&id));
-        }
-#endif
-    }
-};
-
-#ifdef SOUNDIO_OS_KQUEUE
-static const uintptr_t notify_ident = 1;
-#endif
-
-struct SoundIoOsCond
-{
-#ifdef SOUNDIO_OS_KQUEUE
-    int kq_id;
-#elif defined(SOUNDIO_OS_WINDOWS)
-    CONDITION_VARIABLE id;
-    CRITICAL_SECTION default_cs_id;
-#else
-    pthread_cond_t id;
-    bool id_init;
-
-    pthread_condattr_t attr;
-    bool attr_init;
-
-    pthread_mutex_t default_mutex_id;
-    bool default_mutex_init;
-#endif
-
-    ~SoundIoOsCond()
-    {
-#ifdef SOUNDIO_OS_KQUEUE
-        close(cond->kq_id);
-#elif defined(SOUNDIO_OS_WINDOWS)
-        DeleteCriticalSection(&cond->default_cs_id);
-#else
-        if (id_init)
-        {
-            assert(!pthread_cond_destroy(&id));
-        }
-
-        if (attr_init)
-        {
-            assert(!pthread_condattr_destroy(&attr));
-        }
-        if (default_mutex_init)
-        {
-            assert(!pthread_mutex_destroy(&default_mutex_id));
-        }
-#endif
-    }
-};
 
 #if defined(SOUNDIO_OS_WINDOWS)
 static INIT_ONCE win32_init_once = INIT_ONCE_STATIC_INIT;
@@ -252,11 +76,11 @@ static void* run_pthread(void* userdata)
 }
 #endif
 
-int soundio_os_thread_create(void (*run)(std::shared_ptr<void> arg), std::shared_ptr<void> arg, void (*emit_rtprio_warning)(), std::shared_ptr<SoundIoOsThread>* out_thread)
+int soundio_os_thread_create(void (*run)(std::shared_ptr<void> arg), std::shared_ptr<void> arg, void (*emit_rtprio_warning)(), std::unique_ptr<SoundIoOsThread>* out_thread)
 {
-    *out_thread = NULL;
+    *out_thread = nullptr;
 
-    std::shared_ptr<SoundIoOsThread> thread = std::make_shared<SoundIoOsThread>();
+    std::unique_ptr<SoundIoOsThread> thread = std::make_unique<SoundIoOsThread>();
     if (!thread)
     {
         thread = nullptr;
@@ -325,7 +149,7 @@ int soundio_os_thread_create(void (*run)(std::shared_ptr<void> arg), std::shared
     thread->running = true;
 #endif
 
-    *out_thread = thread;
+    *out_thread = std::move(thread);
     return 0;
 }
 
@@ -358,9 +182,9 @@ int soundio_os_thread_create(void (*run)(std::shared_ptr<void> arg), std::shared
 //     free(thread);
 // }
 
-std::shared_ptr<SoundIoOsMutex> soundio_os_mutex_create()
+std::unique_ptr<SoundIoOsMutex> soundio_os_mutex_create()
 {
-    std::shared_ptr<SoundIoOsMutex> mutex = std::make_shared<SoundIoOsMutex>();
+    std::unique_ptr<SoundIoOsMutex> mutex = std::make_unique<SoundIoOsMutex>();
     if (!mutex)
     {
         return NULL;
@@ -399,7 +223,7 @@ std::shared_ptr<SoundIoOsMutex> soundio_os_mutex_create()
 //     free(mutex);
 // }
 
-void soundio_os_mutex_lock(std::shared_ptr<SoundIoOsMutex> mutex)
+void soundio_os_mutex_lock(std::unique_ptr<SoundIoOsMutex>& mutex)
 {
 #if defined(SOUNDIO_OS_WINDOWS)
     EnterCriticalSection(&mutex->id);
@@ -408,7 +232,7 @@ void soundio_os_mutex_lock(std::shared_ptr<SoundIoOsMutex> mutex)
 #endif
 }
 
-void soundio_os_mutex_unlock(std::shared_ptr<SoundIoOsMutex> mutex)
+void soundio_os_mutex_unlock(std::unique_ptr<SoundIoOsMutex>& mutex)
 {
 #if defined(SOUNDIO_OS_WINDOWS)
     LeaveCriticalSection(&mutex->id);
@@ -418,9 +242,9 @@ void soundio_os_mutex_unlock(std::shared_ptr<SoundIoOsMutex> mutex)
 }
 
 
-std::shared_ptr<SoundIoOsCond> soundio_os_cond_create()
+std::unique_ptr<SoundIoOsCond> soundio_os_cond_create()
 {
-    std::shared_ptr<SoundIoOsCond> cond = std::shared_ptr<SoundIoOsCond>();
+    std::unique_ptr<SoundIoOsCond> cond = std::make_unique<SoundIoOsCond>();
 
     if (!cond)
     {
@@ -491,7 +315,7 @@ std::shared_ptr<SoundIoOsCond> soundio_os_cond_create()
 //     free(cond);
 // }
 
-void soundio_os_cond_signal(std::shared_ptr<SoundIoOsCond> cond, std::shared_ptr<SoundIoOsMutex> locked_mutex)
+void soundio_os_cond_signal(SoundIoOsCond* cond, SoundIoOsMutex* locked_mutex)
 {
 #if defined(SOUNDIO_OS_WINDOWS)
     if (locked_mutex)
@@ -535,7 +359,7 @@ void soundio_os_cond_signal(std::shared_ptr<SoundIoOsCond> cond, std::shared_ptr
 #endif
 }
 
-void soundio_os_cond_timed_wait(std::shared_ptr<SoundIoOsCond> cond, std::shared_ptr<SoundIoOsMutex> locked_mutex, double seconds)
+void soundio_os_cond_timed_wait(SoundIoOsCond* cond, SoundIoOsMutex* locked_mutex, double seconds)
 {
 #if defined(SOUNDIO_OS_WINDOWS)
     CRITICAL_SECTION* target_cs;
@@ -606,7 +430,7 @@ void soundio_os_cond_timed_wait(std::shared_ptr<SoundIoOsCond> cond, std::shared
 #endif
 }
 
-void soundio_os_cond_wait(std::shared_ptr<SoundIoOsCond> cond, std::shared_ptr<SoundIoOsMutex> locked_mutex)
+void soundio_os_cond_wait(SoundIoOsCond* cond, SoundIoOsMutex* locked_mutex)
 {
 #if defined(SOUNDIO_OS_WINDOWS)
     CRITICAL_SECTION* target_cs;

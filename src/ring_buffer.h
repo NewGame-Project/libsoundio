@@ -28,6 +28,52 @@ struct SoundIoRingBuffer
         return mem->capacity;
     }
 
+    int fill_count() const
+    {
+        unsigned long read_offset = SOUNDIO_ATOMIC_LOAD(this->read_offset);
+        unsigned long write_offset = SOUNDIO_ATOMIC_LOAD(this->write_offset);
+        int count = static_cast<int>(write_offset - read_offset);
+        assert(count >= 0);
+        assert(count <= capacity());
+        return count;
+    }
+
+    char* write_ptr()
+    {
+        unsigned long write_offset = SOUNDIO_ATOMIC_LOAD(this->write_offset);
+        return mem->address.get() + (write_offset % capacity());
+    }
+
+    char* read_ptr()
+    {
+        unsigned long read_offset = SOUNDIO_ATOMIC_LOAD(this->read_offset);
+        return mem->address.get() + (read_offset % capacity());
+    }
+
+
+    void advance_write_ptr(int count)
+    {
+        SOUNDIO_ATOMIC_FETCH_ADD(this->write_offset, count);
+        assert(fill_count() >= 0);
+    }
+
+    void advance_read_ptr(int count)
+    {
+        SOUNDIO_ATOMIC_FETCH_ADD(read_offset, count);
+        assert(fill_count() >= 0);
+    }
+
+    int free_count() const
+    {
+        return capacity() - fill_count();
+    }
+
+    void clear()
+    {
+        unsigned long read_offset = SOUNDIO_ATOMIC_LOAD(this->read_offset);
+        SOUNDIO_ATOMIC_STORE(write_offset, read_offset);
+    }
+
 private:
     int init_mirrored_memory(int requested_capacity);
 };

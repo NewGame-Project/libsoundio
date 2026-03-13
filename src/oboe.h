@@ -9,6 +9,12 @@
 #include "os.h"
 #include "atomics.h"
 #include "oboe_callback.h"
+#include "oboe/Oboe.h"
+
+struct OboeStreamDeleter
+{
+    void operator()(oboe::AudioStream* stream) const;
+};
 
 struct SoundIoPrivate;
 
@@ -21,16 +27,16 @@ int soundio_oboe_init(std::shared_ptr<SoundIoPrivate> si);
 
 struct SoundIoOboe
 {
-    std::shared_ptr<SoundIoOsMutex> mutex;
-    std::shared_ptr<SoundIoOsCond> cond;
-    std::shared_ptr<SoundIoOsThread> thread;
+    std::unique_ptr<SoundIoOsMutex> mutex;
+    std::unique_ptr<SoundIoOsCond> cond;
+    std::unique_ptr<SoundIoOsThread> thread;
     struct SoundIoAtomicFlag abort_flag;
 
     // this one is ready to be read with flush_events. protected by mutex
-    std::shared_ptr<struct SoundIoDevicesInfo> ready_devices_info;
+    std::unique_ptr<struct SoundIoDevicesInfo> ready_devices_info;
     struct SoundIoAtomicBool have_devices_flag;
-    std::shared_ptr<SoundIoOsCond> have_devices_cond;
-    std::shared_ptr<SoundIoOsCond> scan_devices_cond;
+    std::unique_ptr<SoundIoOsCond> have_devices_cond;
+    std::unique_ptr<SoundIoOsCond> scan_devices_cond;
 
     struct SoundIoAtomicBool device_scan_queued;
     struct SoundIoAtomicBool service_restarted;
@@ -47,7 +53,7 @@ struct SoundIoOutStreamOboe
     float* request_audio_data;
     int request_num_frames;
 
-    std::unique_ptr<oboe::AudioStream, std::function<void(oboe::AudioStream*)>> output_stream;
+    std::unique_ptr<oboe::AudioStream> output_stream;
     std::unique_ptr<oboe_callback> callback;
 
     struct SoundIoChannelArea areas[SOUNDIO_MAX_CHANNELS];

@@ -308,10 +308,10 @@ static struct SoundIoChannelLayout builtin_channel_layouts[] = {
     },
 };
 
+
 #define CHANNEL_NAME_ALIAS_COUNT 3
-typedef const std::wstring channel_names_t[CHANNEL_NAME_ALIAS_COUNT];
-static channel_names_t channel_names[] = {
-    {L"(Invalid Channel)", NULL, NULL},
+static const wchar_t* channel_names[][CHANNEL_NAME_ALIAS_COUNT] = {
+    {L"(Invalid Channel)", nullptr, nullptr},
     {L"Front Left", L"FL", L"front-left"},
     {L"Front Right", L"FR", L"front-right"},
     {L"Front Center", L"FC", L"front-center"},
@@ -330,56 +330,56 @@ static channel_names_t channel_names[] = {
     {L"Top Back Left", L"TBL", L"top-rear-left"},
     {L"Top Back Center", L"TBC", L"top-rear-center"},
     {L"Top Back Right", L"TBR", L"top-rear-right"},
-    {L"Back Left Center", NULL, NULL},
-    {L"Back Right Center", NULL, NULL},
-    {L"Front Left Wide", NULL, NULL},
-    {L"Front Right Wide", NULL, NULL},
-    {L"Front Left High", NULL, NULL},
-    {L"Front Center High", NULL, NULL},
-    {L"Front Right High", NULL, NULL},
-    {L"Top Front Left Center", NULL, NULL},
-    {L"Top Front Right Center", NULL, NULL},
-    {L"Top Side Left", NULL, NULL},
-    {L"Top Side Right", NULL, NULL},
-    {L"Left LFE", NULL, NULL},
-    {L"Right LFE", NULL, NULL},
-    {L"LFE 2", NULL, NULL},
-    {L"Bottom Center", NULL, NULL},
-    {L"Bottom Left Center", NULL, NULL},
-    {L"Bottom Right Center", NULL, NULL},
-    {L"Mid/Side Mid", NULL, NULL},
-    {L"Mid/Side Side", NULL, NULL},
-    {L"Ambisonic W", NULL, NULL},
-    {L"Ambisonic X", NULL, NULL},
-    {L"Ambisonic Y", NULL, NULL},
-    {L"Ambisonic Z", NULL, NULL},
-    {L"X-Y X", NULL, NULL},
-    {L"X-Y Y", NULL, NULL},
-    {L"Headphones Left", NULL, NULL},
-    {L"Headphones Right", NULL, NULL},
-    {L"Click Track", NULL, NULL},
-    {L"Foreign Language", NULL, NULL},
-    {L"Hearing Impaired", NULL, NULL},
-    {L"Narration", NULL, NULL},
-    {L"Haptic", NULL, NULL},
-    {L"Dialog Centric Mix", NULL, NULL},
-    {L"Aux", NULL, NULL},
-    {L"Aux 0", NULL, NULL},
-    {L"Aux 1", NULL, NULL},
-    {L"Aux 2", NULL, NULL},
-    {L"Aux 3", NULL, NULL},
-    {L"Aux 4", NULL, NULL},
-    {L"Aux 5", NULL, NULL},
-    {L"Aux 6", NULL, NULL},
-    {L"Aux 7", NULL, NULL},
-    {L"Aux 8", NULL, NULL},
-    {L"Aux 9", NULL, NULL},
-    {L"Aux 10", NULL, NULL},
-    {L"Aux 11", NULL, NULL},
-    {L"Aux 12", NULL, NULL},
-    {L"Aux 13", NULL, NULL},
-    {L"Aux 14", NULL, NULL},
-    {L"Aux 15", NULL, NULL},
+    {L"Back Left Center", nullptr, nullptr},
+    {L"Back Right Center", nullptr, nullptr},
+    {L"Front Left Wide", nullptr, nullptr},
+    {L"Front Right Wide", nullptr, nullptr},
+    {L"Front Left High", nullptr, nullptr},
+    {L"Front Center High", nullptr, nullptr},
+    {L"Front Right High", nullptr, nullptr},
+    {L"Top Front Left Center", nullptr, nullptr},
+    {L"Top Front Right Center", nullptr, nullptr},
+    {L"Top Side Left", nullptr, nullptr},
+    {L"Top Side Right", nullptr, nullptr},
+    {L"Left LFE", nullptr, nullptr},
+    {L"Right LFE", nullptr, nullptr},
+    {L"LFE 2", nullptr, nullptr},
+    {L"Bottom Center", nullptr, nullptr},
+    {L"Bottom Left Center", nullptr, nullptr},
+    {L"Bottom Right Center", nullptr, nullptr},
+    {L"Mid/Side Mid", nullptr, nullptr},
+    {L"Mid/Side Side", nullptr, nullptr},
+    {L"Ambisonic W", nullptr, nullptr},
+    {L"Ambisonic X", nullptr, nullptr},
+    {L"Ambisonic Y", nullptr, nullptr},
+    {L"Ambisonic Z", nullptr, nullptr},
+    {L"X-Y X", nullptr, nullptr},
+    {L"X-Y Y", nullptr, nullptr},
+    {L"Headphones Left", nullptr, nullptr},
+    {L"Headphones Right", nullptr, nullptr},
+    {L"Click Track", nullptr, nullptr},
+    {L"Foreign Language", nullptr, nullptr},
+    {L"Hearing Impaired", nullptr, nullptr},
+    {L"Narration", nullptr, nullptr},
+    {L"Haptic", nullptr, nullptr},
+    {L"Dialog Centric Mix", nullptr, nullptr},
+    {L"Aux", nullptr, nullptr},
+    {L"Aux 0", nullptr, nullptr},
+    {L"Aux 1", nullptr, nullptr},
+    {L"Aux 2", nullptr, nullptr},
+    {L"Aux 3", nullptr, nullptr},
+    {L"Aux 4", nullptr, nullptr},
+    {L"Aux 5", nullptr, nullptr},
+    {L"Aux 6", nullptr, nullptr},
+    {L"Aux 7", nullptr, nullptr},
+    {L"Aux 8", nullptr, nullptr},
+    {L"Aux 9", nullptr, nullptr},
+    {L"Aux 10", nullptr, nullptr},
+    {L"Aux 11", nullptr, nullptr},
+    {L"Aux 12", nullptr, nullptr},
+    {L"Aux 13", nullptr, nullptr},
+    {L"Aux 14", nullptr, nullptr},
+    {L"Aux 15", nullptr, nullptr},
 };
 
 const std::wstring soundio_get_channel_name(enum SoundIoChannelId id)
@@ -388,7 +388,13 @@ const std::wstring soundio_get_channel_name(enum SoundIoChannelId id)
     {
         return L"(Invalid Channel)";
     }
-    return channel_names[id][0];
+    auto p = channel_names[id][0];
+    if (p == nullptr)
+    {
+        return std::wstring();
+    }
+
+    return p;
 }
 
 bool soundio_channel_layout_equal(const struct SoundIoChannelLayout* a, const struct SoundIoChannelLayout* b)
@@ -473,12 +479,13 @@ enum SoundIoChannelId soundio_parse_channel_id(const std::wstring str)
     {
         for (int i = 0; i < CHANNEL_NAME_ALIAS_COUNT; i += 1)
         {
-            const std::wstring alias = channel_names[id][i];
-            if (alias.empty())
+            const wchar_t* p = channel_names[id][i];
+            if (p == nullptr)
             {
                 break;
             }
 
+            const std::wstring alias = p;
             if (alias == str)
             {
                 return static_cast<SoundIoChannelId>(id);

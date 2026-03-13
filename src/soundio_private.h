@@ -176,7 +176,7 @@ struct SoundIoInStreamPrivate : SoundIoInStream
 struct SoundIoPrivate : public SoundIo
 {
     // Safe to read from a single thread without a mutex.
-    std::shared_ptr<SoundIoDevicesInfo> safe_devices_info;
+    std::unique_ptr<SoundIoDevicesInfo> safe_devices_info;
     std::unique_ptr<SoundIoBackendData> backend_data;
 
     void (*destroy)(std::shared_ptr<SoundIoPrivate>);
