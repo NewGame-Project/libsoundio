@@ -540,7 +540,7 @@ int soundio_dummy_init(std::shared_ptr<SoundIoPrivate> si)
         }
         std::shared_ptr<SoundIoDevice> device = dev;
 
-        device->ref_count = 1;
+        // device->ref_count = 1;
         device->soundio = soundio;
         device->id = *"dummy-out";
         device->name = *"Dummy Output Device";
@@ -580,7 +580,7 @@ int soundio_dummy_init(std::shared_ptr<SoundIoPrivate> si)
         }
         std::shared_ptr<SoundIoDevice> device = dev;
 
-        device->ref_count = 1;
+        // device->ref_count = 1;
         device->soundio = soundio;
         device->id = *"dummy-in";
         device->name = *"Dummy Input Device";

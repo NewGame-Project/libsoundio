@@ -56,10 +56,12 @@ static int refresh_devices(std::shared_ptr<SoundIoPrivate> si)
         }
 
 
-        dev->ref_count = 1;
+        // dev->ref_count = 1;
         dev->soundio = soundio;
         dev->is_raw = false;
         dev->aim = aim;
+        dev->name = aim == SoundIoDeviceAimInput ? L"Oboe Input" : L"Oboe Output";
+        dev->id = aim == SoundIoDeviceAimInput ? L"Oboe Input Device" : L"Oboe Output Device";
 
         dev->formats.push_back(SoundIoFormatFloat32LE);
 

@@ -436,7 +436,7 @@ struct SoundIoDevice
 
     /// Devices are reference counted. See ::soundio_device_ref and
     /// ::soundio_device_unref.
-    int ref_count;
+    // int ref_count;
 
     /// This is set to a SoundIoError representing the result of the device
     /// probe. Ideally this will be SoundIoErrorNone in which case all the

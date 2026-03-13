@@ -872,7 +872,7 @@ static int refresh_devices(std::shared_ptr<SoundIoPrivate> si)
         std::shared_ptr<SoundIoDevicePrivate> shared_w = std::make_shared<SoundIoDevicePrivate>();
 
         rd->device_shared = shared_w;
-        rd->device_shared->ref_count = 1;
+        // rd->device_shared->ref_count = 1;
         rd->device_shared->soundio = soundio;
         rd->device_shared->is_raw = false;
         rd->device_shared->software_latency_max = 2.0;
@@ -881,7 +881,7 @@ static int refresh_devices(std::shared_ptr<SoundIoPrivate> si)
         std::shared_ptr<SoundIoDevicePrivate> raw_w = std::make_shared<SoundIoDevicePrivate>();
 
         rd->device_raw = raw_w;
-        rd->device_raw->ref_count = 1;
+        // rd->device_raw->ref_count = 1;
         rd->device_raw->soundio = soundio;
         rd->device_raw->is_raw = true;
         rd->device_raw->software_latency_max = 0.5;
