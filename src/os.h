@@ -39,34 +39,31 @@ int soundio_os_thread_create(void (*run)(std::shared_ptr<void> arg), std::shared
 
 struct SoundIoOsMutex;
 
-struct SoundIoOsMutex* soundio_os_mutex_create(void);
+std::shared_ptr<SoundIoOsMutex> soundio_os_mutex_create();
 
-void soundio_os_mutex_destroy(struct SoundIoOsMutex* mutex);
+// void soundio_os_mutex_destroy(struct SoundIoOsMutex* mutex);
 
-void soundio_os_mutex_lock(struct SoundIoOsMutex* mutex);
+void soundio_os_mutex_lock(std::shared_ptr<SoundIoOsMutex> mutex);
 
-void soundio_os_mutex_unlock(struct SoundIoOsMutex* mutex);
+void soundio_os_mutex_unlock(std::shared_ptr<SoundIoOsMutex> mutex);
 
 struct SoundIoOsCond;
 struct SoundIoRingBuffer;
 
-struct SoundIoOsCond* soundio_os_cond_create(void);
+std::shared_ptr<SoundIoOsCond> soundio_os_cond_create(void);
 
-void soundio_os_cond_destroy(struct SoundIoOsCond* cond);
+// void soundio_os_cond_destroy(struct SoundIoOsCond* cond);
 
 // locked_mutex is optional. On systems that use mutexes for conditions, if you
 // pass NULL, a mutex will be created and locked/unlocked for you. On systems
 // that do not use mutexes for conditions, no mutex handling is necessary. If
 // you already have a locked mutex available, pass it; this will be better on
 // systems that use mutexes for conditions.
-void soundio_os_cond_signal(struct SoundIoOsCond* cond,
-                            struct SoundIoOsMutex* locked_mutex);
+void soundio_os_cond_signal(std::shared_ptr<SoundIoOsCond> cond, std::shared_ptr<SoundIoOsMutex> locked_mutex);
 
-void soundio_os_cond_timed_wait(struct SoundIoOsCond* cond,
-                                struct SoundIoOsMutex* locked_mutex, double seconds);
+void soundio_os_cond_timed_wait(std::shared_ptr<SoundIoOsCond> cond, std::shared_ptr<SoundIoOsMutex> locked_mutex, double seconds);
 
-void soundio_os_cond_wait(struct SoundIoOsCond* cond,
-                          struct SoundIoOsMutex* locked_mutex);
+void soundio_os_cond_wait(std::shared_ptr<SoundIoOsCond> cond, std::shared_ptr<SoundIoOsMutex> locked_mutex);
 
 
 int soundio_os_page_size(void);

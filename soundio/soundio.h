@@ -374,9 +374,7 @@ struct SoundIoDevice
 
     /// List of formats this device supports. See also
     /// SoundIoDevice::current_format.
-    enum SoundIoFormat* formats;
-    /// How many formats are available in SoundIoDevice::formats.
-    int format_count;
+    std::vector<SoundIoFormat> formats;
     /// A device is either a raw device or it is a virtual device that is
     /// provided by a software mixing service such as dmix or PulseAudio (see
     /// SoundIoDevice::is_raw). If it is a raw device,
@@ -836,12 +834,12 @@ SOUNDIO_EXPORT bool soundio_channel_layout_equal(
     const struct SoundIoChannelLayout* a,
     const struct SoundIoChannelLayout* b);
 
-SOUNDIO_EXPORT const char* soundio_get_channel_name(enum SoundIoChannelId id);
+SOUNDIO_EXPORT const std::wstring soundio_get_channel_name(enum SoundIoChannelId id);
 
 /// Given UTF-8 encoded text which is the name of a channel such as
 /// "Front Left", "FL", or "front-left", return the corresponding
 /// SoundIoChannelId. Returns SoundIoChannelIdInvalid for no match.
-SOUNDIO_EXPORT enum SoundIoChannelId soundio_parse_channel_id(const char* str, int str_len);
+SOUNDIO_EXPORT enum SoundIoChannelId soundio_parse_channel_id(const std::wstring str);
 
 /// Returns the number of builtin channel layouts.
 SOUNDIO_EXPORT int soundio_channel_layout_builtin_count(void);

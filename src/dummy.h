@@ -20,8 +20,8 @@ int soundio_dummy_init(std::shared_ptr<SoundIoPrivate> si);
 
 struct SoundIoDummy
 {
-    struct SoundIoOsMutex* mutex;
-    struct SoundIoOsCond* cond;
+    std::shared_ptr<SoundIoOsMutex> mutex;
+    std::shared_ptr<SoundIoOsCond> cond;
     bool devices_emitted;
 };
 
@@ -33,7 +33,7 @@ struct SoundIoDeviceDummy
 struct SoundIoOutStreamDummy
 {
     std::shared_ptr<SoundIoOsThread> thread;
-    struct SoundIoOsCond* cond;
+    std::shared_ptr<SoundIoOsCond> cond;
     struct SoundIoAtomicFlag abort_flag;
     double period_duration;
     int buffer_frame_count;
@@ -49,7 +49,7 @@ struct SoundIoOutStreamDummy
 struct SoundIoInStreamDummy
 {
     std::shared_ptr<SoundIoOsThread> thread;
-    struct SoundIoOsCond* cond;
+    std::shared_ptr<SoundIoOsCond> cond;
     struct SoundIoAtomicFlag abort_flag;
     double period_duration;
     int frames_left;

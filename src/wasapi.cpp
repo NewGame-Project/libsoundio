@@ -770,12 +770,12 @@ struct IMMDeviceDeleter
 static int refresh_devices(std::shared_ptr<SoundIoPrivate> si)
 {
     std::shared_ptr<SoundIo> soundio = si;
-    struct SoundIoWasapi* siw = &si->backend_data.wasapi;
+    SoundIoWasapi& siw = si->backend_data->wasapi;
     std::shared_ptr<RefreshDevices> rd = std::make_shared<RefreshDevices>();
     int err;
     HRESULT hr;
 
-    if (FAILED(hr = siw->device_enumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &rd->default_render_device)))
+    if (FAILED(hr = siw.device_enumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &rd->default_render_device)))
     {
         if (hr != E_NOTFOUND)
         {
@@ -806,7 +806,7 @@ static int refresh_devices(std::shared_ptr<SoundIoPrivate> si)
     }
 
 
-    if (FAILED(hr = siw->device_enumerator->GetDefaultAudioEndpoint(eCapture, eMultimedia, &rd->default_capture_device)))
+    if (FAILED(hr = siw.device_enumerator->GetDefaultAudioEndpoint(eCapture, eMultimedia, &rd->default_capture_device)))
     {
         if (hr != E_NOTFOUND)
         {
@@ -838,7 +838,7 @@ static int refresh_devices(std::shared_ptr<SoundIoPrivate> si)
     }
 
 
-    if (FAILED(hr = siw->device_enumerator->EnumAudioEndpoints(eAll, DEVICE_STATE_ACTIVE, &rd->collection)))
+    if (FAILED(hr = siw.device_enumerator->EnumAudioEndpoints(eAll, DEVICE_STATE_ACTIVE, &rd->collection)))
     {
         deinit_refresh_devices(rd);
         if (hr == E_OUTOFMEMORY)
@@ -1161,13 +1161,13 @@ static int refresh_devices(std::shared_ptr<SoundIoPrivate> si)
         rd->device_raw = NULL;
     }
 
-    soundio_os_mutex_lock(siw->mutex);
+    soundio_os_mutex_lock(siw.mutex);
     // soundio_destroy_devices_info(siw->ready_devices_info);
-    siw->ready_devices_info = rd->devices_info;
-    siw->have_devices_flag = true;
-    soundio_os_cond_signal(siw->cond, siw->mutex);
+    siw.ready_devices_info = rd->devices_info;
+    siw.have_devices_flag = true;
+    soundio_os_cond_signal(siw.cond, siw.mutex);
     soundio->on_events_signal(soundio);
-    soundio_os_mutex_unlock(siw->mutex);
+    soundio_os_mutex_unlock(siw.mutex);
 
     rd->devices_info = NULL;
     deinit_refresh_devices(rd);
@@ -1179,50 +1179,50 @@ static int refresh_devices(std::shared_ptr<SoundIoPrivate> si)
 static void shutdown_backend(std::shared_ptr<SoundIoPrivate> si, int err)
 {
     std::shared_ptr<SoundIo> soundio = si;
-    struct SoundIoWasapi* siw = &si->backend_data.wasapi;
-    soundio_os_mutex_lock(siw->mutex);
-    siw->shutdown_err = err;
-    soundio_os_cond_signal(siw->cond, siw->mutex);
+    SoundIoWasapi& siw = si->backend_data->wasapi;
+    soundio_os_mutex_lock(siw.mutex);
+    siw.shutdown_err = err;
+    soundio_os_cond_signal(siw.cond, siw.mutex);
     soundio->on_events_signal(soundio);
-    soundio_os_mutex_unlock(siw->mutex);
+    soundio_os_mutex_unlock(siw.mutex);
 }
 
 
 static void my_flush_events(std::shared_ptr<SoundIoPrivate> si, bool wait)
 {
     std::shared_ptr<SoundIo> soundio = si;
-    struct SoundIoWasapi* siw = &si->backend_data.wasapi;
+    SoundIoWasapi& siw = si->backend_data->wasapi;
 
     bool change = false;
     bool cb_shutdown = false;
-    std::shared_ptr<SoundIoDevicesInfo> old_devices_info = NULL;
+    // std::shared_ptr<SoundIoDevicesInfo> old_devices_info = NULL;
 
-    soundio_os_mutex_lock(siw->mutex);
+    soundio_os_mutex_lock(siw.mutex);
 
     // block until have devices
-    while (wait || (!siw->have_devices_flag && !siw->shutdown_err))
+    while (wait || (!siw.have_devices_flag && !siw.shutdown_err))
     {
-        soundio_os_cond_wait(siw->cond, siw->mutex);
+        soundio_os_cond_wait(siw.cond, siw.mutex);
         wait = false;
     }
 
-    if (siw->shutdown_err && !siw->emitted_shutdown_cb)
+    if (siw.shutdown_err && !siw.emitted_shutdown_cb)
     {
-        siw->emitted_shutdown_cb = true;
+        siw.emitted_shutdown_cb = true;
         cb_shutdown = true;
     }
-    else if (siw->ready_devices_info)
+    else if (siw.ready_devices_info)
     {
-        old_devices_info = si->safe_devices_info;
-        si->safe_devices_info = siw->ready_devices_info;
-        siw->ready_devices_info = NULL;
+        // old_devices_info = si->safe_devices_info;
+        si->safe_devices_info = siw.ready_devices_info;
+        siw.ready_devices_info = NULL;
         change = true;
     }
 
-    soundio_os_mutex_unlock(siw->mutex);
+    soundio_os_mutex_unlock(siw.mutex);
 
     if (cb_shutdown)
-        soundio->on_backend_disconnect(soundio, siw->shutdown_err);
+        soundio->on_backend_disconnect(soundio, siw.shutdown_err);
     else if (change)
         soundio->on_devices_change(soundio);
 
@@ -1243,64 +1243,64 @@ static void wait_events_wasapi(std::shared_ptr<SoundIoPrivate> si)
 static void device_thread_run(std::shared_ptr<void> arg)
 {
     std::shared_ptr<SoundIoPrivate> si = std::static_pointer_cast<SoundIoPrivate>(arg);
-    struct SoundIoWasapi* siw = &si->backend_data.wasapi;
+    SoundIoWasapi& siw = si->backend_data->wasapi;
     int err;
 
-    HRESULT hr = CoCreateInstance(CLSID_MMDEVICEENUMERATOR, NULL, CLSCTX_ALL, IID_IMMDEVICEENUMERATOR, reinterpret_cast<void**>(&siw->device_enumerator));
+    HRESULT hr = CoCreateInstance(CLSID_MMDEVICEENUMERATOR, NULL, CLSCTX_ALL, IID_IMMDEVICEENUMERATOR, reinterpret_cast<void**>(&siw.device_enumerator));
     if (FAILED(hr))
     {
         shutdown_backend(si, SoundIoErrorSystemResources);
         return;
     }
 
-    if (FAILED(hr = siw->device_enumerator->RegisterEndpointNotificationCallback(siw->device_events.get())))
+    if (FAILED(hr = siw.device_enumerator->RegisterEndpointNotificationCallback(siw.device_events.get())))
     {
         shutdown_backend(si, SoundIoErrorSystemResources);
         return;
     }
 
-    soundio_os_mutex_lock(siw->scan_devices_mutex);
+    soundio_os_mutex_lock(siw.scan_devices_mutex);
     for (;;)
     {
-        if (siw->abort_flag)
+        if (siw.abort_flag)
         {
             break;
         }
-        if (siw->device_scan_queued)
+        if (siw.device_scan_queued)
         {
-            siw->device_scan_queued = false;
-            soundio_os_mutex_unlock(siw->scan_devices_mutex);
+            siw.device_scan_queued = false;
+            soundio_os_mutex_unlock(siw.scan_devices_mutex);
             err = refresh_devices(si);
             if (err)
             {
                 shutdown_backend(si, err);
                 return;
             }
-            soundio_os_mutex_lock(siw->scan_devices_mutex);
+            soundio_os_mutex_lock(siw.scan_devices_mutex);
             continue;
         }
-        soundio_os_cond_wait(siw->scan_devices_cond, siw->scan_devices_mutex);
+        soundio_os_cond_wait(siw.scan_devices_cond, siw.scan_devices_mutex);
     }
-    soundio_os_mutex_unlock(siw->scan_devices_mutex);
+    soundio_os_mutex_unlock(siw.scan_devices_mutex);
 
-    siw->device_enumerator->UnregisterEndpointNotificationCallback(siw->device_events.get());
-    siw->device_enumerator->Release();
-    siw->device_enumerator = NULL;
+    siw.device_enumerator->UnregisterEndpointNotificationCallback(siw.device_events.get());
+    siw.device_enumerator->Release();
+    siw.device_enumerator = NULL;
 }
 
 static void wakeup_wasapi(std::shared_ptr<SoundIoPrivate> si)
 {
-    struct SoundIoWasapi* siw = &si->backend_data.wasapi;
-    soundio_os_cond_signal(siw->cond, siw->mutex);
+    SoundIoWasapi& siw = si->backend_data->wasapi;
+    soundio_os_cond_signal(siw.cond, siw.mutex);
 }
 
 static void force_device_scan_wasapi(std::shared_ptr<SoundIoPrivate> si)
 {
-    struct SoundIoWasapi* siw = &si->backend_data.wasapi;
-    soundio_os_mutex_lock(siw->scan_devices_mutex);
-    siw->device_scan_queued = true;
-    soundio_os_cond_signal(siw->scan_devices_cond, siw->scan_devices_mutex);
-    soundio_os_mutex_unlock(siw->scan_devices_mutex);
+    SoundIoWasapi& siw = si->backend_data->wasapi;
+    soundio_os_mutex_lock(siw.scan_devices_mutex);
+    siw.device_scan_queued = true;
+    soundio_os_cond_signal(siw.scan_devices_cond, siw.scan_devices_mutex);
+    soundio_os_mutex_unlock(siw.scan_devices_mutex);
 }
 
 static void outstream_thread_deinit(std::shared_ptr<SoundIoPrivate> si, std::shared_ptr<SoundIoOutStreamPrivate> os)
@@ -2647,43 +2647,43 @@ static int instream_get_latency_wasapi(std::shared_ptr<SoundIoPrivate> si, std::
 
 static void destroy_wasapi(std::shared_ptr<SoundIoPrivate> si)
 {
-    struct SoundIoWasapi* siw = &si->backend_data.wasapi;
+    SoundIoWasapi& siw = si->backend_data->wasapi;
 
-    if (siw->thread)
+    if (siw.thread)
     {
-        soundio_os_mutex_lock(siw->scan_devices_mutex);
-        siw->abort_flag = true;
-        soundio_os_cond_signal(siw->scan_devices_cond, siw->scan_devices_mutex);
-        soundio_os_mutex_unlock(siw->scan_devices_mutex);
+        soundio_os_mutex_lock(siw.scan_devices_mutex);
+        siw.abort_flag = true;
+        soundio_os_cond_signal(siw.scan_devices_cond, siw.scan_devices_mutex);
+        soundio_os_mutex_unlock(siw.scan_devices_mutex);
         // soundio_os_thread_destroy(siw->thread);
-        siw->thread = nullptr;
+        siw.thread = nullptr;
     }
 
-    if (siw->cond)
+    if (siw.cond)
     {
-        soundio_os_cond_destroy(siw->cond);
+        soundio_os_cond_destroy(siw.cond);
     }
 
-    if (siw->scan_devices_cond)
+    if (siw.scan_devices_cond)
     {
-        soundio_os_cond_destroy(siw->scan_devices_cond);
+        soundio_os_cond_destroy(siw.scan_devices_cond);
     }
 
-    if (siw->scan_devices_mutex)
+    if (siw.scan_devices_mutex)
     {
-        soundio_os_mutex_destroy(siw->scan_devices_mutex);
+        soundio_os_mutex_destroy(siw.scan_devices_mutex);
     }
 
-    if (siw->mutex)
+    if (siw.mutex)
     {
-        soundio_os_mutex_destroy(siw->mutex);
+        soundio_os_mutex_destroy(siw.mutex);
     }
 }
 
 
 // static inline std::shared_ptr<SoundIoPrivate> soundio_MMNotificationClient_si(soundio_NotificationClient* client)
 // {
-//     struct SoundIoWasapi* siw = (struct SoundIoWasapi*) (((char*) client) - offsetof(struct SoundIoWasapi, device_events));
+//     SoundIoWasapi& siw = (SoundIoWasapi&) (((char*) client) - offsetof(struct SoundIoWasapi, device_events));
 //     std::shared_ptr<SoundIoPrivate> si = (std::shared_ptr<SoundIoPrivate>) (((char*) siw) - offsetof(struct SoundIoPrivate, backend_data));
 //     return si;
 // }
@@ -2705,14 +2705,14 @@ STDMETHODIMP soundio_NotificationClient::QueryInterface(REFIID riid, void** ppv)
 
 STDMETHODIMP_(ULONG) soundio_NotificationClient::AddRef()
 {
-    // struct SoundIoWasapi* siw = &si.lock()->backend_data.wasapi;
+    // SoundIoWasapi& siw = &si.lock()->backend_data.wasapi;
     // return InterlockedIncrement(&siw->device_events_refs);
     return S_OK;
 }
 
 STDMETHODIMP_(ULONG) soundio_NotificationClient::Release()
 {
-    // struct SoundIoWasapi* siw = &si.lock()->backend_data.wasapi;
+    // SoundIoWasapi& siw = &si.lock()->backend_data.wasapi;
     // return InterlockedDecrement(&siw->device_events_refs);
     return S_OK;
 }
@@ -2759,34 +2759,34 @@ STDMETHODIMP soundio_NotificationClient::OnPropertyValueChanged(LPCWSTR wid, con
 
 int soundio_wasapi_init(std::shared_ptr<SoundIoPrivate> si)
 {
-    struct SoundIoWasapi* siw = &si->backend_data.wasapi;
+    SoundIoWasapi& siw = si->backend_data->wasapi;
     int err;
 
-    siw->device_scan_queued = true;
+    siw.device_scan_queued = true;
 
-    siw->mutex = soundio_os_mutex_create();
-    if (!siw->mutex)
+    siw.mutex = soundio_os_mutex_create();
+    if (!siw.mutex)
     {
         destroy_wasapi(si);
         return SoundIoErrorNoMem;
     }
 
-    siw->scan_devices_mutex = soundio_os_mutex_create();
-    if (!siw->scan_devices_mutex)
+    siw.scan_devices_mutex = soundio_os_mutex_create();
+    if (!siw.scan_devices_mutex)
     {
         destroy_wasapi(si);
         return SoundIoErrorNoMem;
     }
 
-    siw->cond = soundio_os_cond_create();
-    if (!siw->cond)
+    siw.cond = soundio_os_cond_create();
+    if (!siw.cond)
     {
         destroy_wasapi(si);
         return SoundIoErrorNoMem;
     }
 
-    siw->scan_devices_cond = soundio_os_cond_create();
-    if (!siw->scan_devices_cond)
+    siw.scan_devices_cond = soundio_os_cond_create();
+    if (!siw.scan_devices_cond)
     {
         destroy_wasapi(si);
         return SoundIoErrorNoMem;
@@ -2795,13 +2795,13 @@ int soundio_wasapi_init(std::shared_ptr<SoundIoPrivate> si)
     // siw->device_events.lpVtbl = &soundio_MMNotificationClient;
 
 
-    if ((err = soundio_os_thread_create(device_thread_run, si, NULL, &siw->thread)))
+    if ((err = soundio_os_thread_create(device_thread_run, si, NULL, &siw.thread)))
     {
         destroy_wasapi(si);
         return err;
     }
 
-    siw->device_events = std::make_shared<soundio_NotificationClient>(si);
+    siw.device_events = std::make_shared<soundio_NotificationClient>(si);
 
     si->destroy = destroy_wasapi;
     si->flush_events = flush_events_wasapi;

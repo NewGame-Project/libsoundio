@@ -21,16 +21,16 @@ int soundio_oboe_init(std::shared_ptr<SoundIoPrivate> si);
 
 struct SoundIoOboe
 {
-    struct SoundIoOsMutex* mutex;
-    struct SoundIoOsCond* cond;
+    std::shared_ptr<SoundIoOsMutex> mutex;
+    std::shared_ptr<SoundIoOsCond> cond;
     std::shared_ptr<SoundIoOsThread> thread;
     struct SoundIoAtomicFlag abort_flag;
 
     // this one is ready to be read with flush_events. protected by mutex
     std::shared_ptr<struct SoundIoDevicesInfo> ready_devices_info;
     struct SoundIoAtomicBool have_devices_flag;
-    struct SoundIoOsCond* have_devices_cond;
-    struct SoundIoOsCond* scan_devices_cond;
+    std::shared_ptr<SoundIoOsCond> have_devices_cond;
+    std::shared_ptr<SoundIoOsCond> scan_devices_cond;
 
     struct SoundIoAtomicBool device_scan_queued;
     struct SoundIoAtomicBool service_restarted;

@@ -137,36 +137,40 @@ static void capture_thread_run(std::shared_ptr<void> arg)
 
 static void destroy_dummy(std::shared_ptr<SoundIoPrivate> si)
 {
-    struct SoundIoDummy* sid = &si->backend_data.dummy;
+    SoundIoDummy& sid = si->backend_data->dummy;
 
-    if (sid->cond)
-        soundio_os_cond_destroy(sid->cond);
+    if (sid.cond)
+    {
+        sid.cond = nullptr;
+    }
 
-    if (sid->mutex)
-        soundio_os_mutex_destroy(sid->mutex);
+    if (sid.mutex)
+    {
+        sid.mutex = nullptr;
+    }
 }
 
 static void flush_events_dummy(std::shared_ptr<SoundIoPrivate> si)
 {
     std::shared_ptr<SoundIo> soundio = si;
-    struct SoundIoDummy* sid = &si->backend_data.dummy;
-    if (sid->devices_emitted)
+    SoundIoDummy& sid = si->backend_data->dummy;
+    if (sid.devices_emitted)
         return;
-    sid->devices_emitted = true;
+    sid.devices_emitted = true;
     soundio->on_devices_change(soundio);
 }
 
 static void wait_events_dummy(std::shared_ptr<SoundIoPrivate> si)
 {
-    struct SoundIoDummy* sid = &si->backend_data.dummy;
+    SoundIoDummy& sid = si->backend_data->dummy;
     flush_events_dummy(si);
-    soundio_os_cond_wait(sid->cond, NULL);
+    soundio_os_cond_wait(sid.cond, NULL);
 }
 
 static void wakeup_dummy(std::shared_ptr<SoundIoPrivate> si)
 {
-    struct SoundIoDummy* sid = &si->backend_data.dummy;
-    soundio_os_cond_signal(sid->cond, NULL);
+    SoundIoDummy& sid = si->backend_data->dummy;
+    soundio_os_cond_signal(sid.cond, NULL);
 }
 
 static void force_device_scan_dummy(std::shared_ptr<SoundIoPrivate> si)
@@ -185,7 +189,7 @@ static void outstream_destroy_dummy(std::shared_ptr<SoundIoPrivate> si, std::sha
         // soundio_os_thread_destroy(osd->thread);
         osd->thread = NULL;
     }
-    soundio_os_cond_destroy(osd->cond);
+
     osd->cond = NULL;
     osd->ring_buffer = nullptr;
     // soundio_ring_buffer_deinit(&osd->ring_buffer);
@@ -317,7 +321,7 @@ static void instream_destroy_dummy(std::shared_ptr<SoundIoPrivate> si, std::shar
         // soundio_os_thread_destroy(isd->thread);
         isd->thread = NULL;
     }
-    soundio_os_cond_destroy(isd->cond);
+    // soundio_os_cond_destroy(isd->cond);
     isd->cond = NULL;
     isd->ring_buffer = nullptr;
 
@@ -377,8 +381,7 @@ static int instream_start_dummy(std::shared_ptr<SoundIoPrivate> si, std::shared_
     assert(!isd->thread);
     SOUNDIO_ATOMIC_FLAG_TEST_AND_SET(isd->abort_flag);
     int err;
-    if ((err = soundio_os_thread_create(capture_thread_run, is,
-                                        soundio->emit_rtprio_warning, &isd->thread)))
+    if ((err = soundio_os_thread_create(capture_thread_run, is, soundio->emit_rtprio_warning, &isd->thread)))
     {
         return err;
     }
@@ -428,29 +431,29 @@ static int instream_get_latency_dummy(std::shared_ptr<SoundIoPrivate> si, std::s
 
 static int set_all_device_formats(std::shared_ptr<SoundIoDevice> device)
 {
-    device->format_count = 18;
-    device->formats = ALLOCATE(enum SoundIoFormat, device->format_count);
-    if (!device->formats)
-        return SoundIoErrorNoMem;
+    // device->format_count = 18;
+    // device->formats = ALLOCATE(enum SoundIoFormat, device->format_count);
+    // if (!device->formats)
+    //     return SoundIoErrorNoMem;
 
-    device->formats[0] = SoundIoFormatFloat32NE;
-    device->formats[1] = SoundIoFormatFloat32FE;
-    device->formats[2] = SoundIoFormatS32NE;
-    device->formats[3] = SoundIoFormatS32FE;
-    device->formats[4] = SoundIoFormatU32NE;
-    device->formats[5] = SoundIoFormatU32FE;
-    device->formats[6] = SoundIoFormatS24NE;
-    device->formats[7] = SoundIoFormatS24FE;
-    device->formats[8] = SoundIoFormatU24NE;
-    device->formats[9] = SoundIoFormatU24FE;
-    device->formats[10] = SoundIoFormatFloat64NE;
-    device->formats[11] = SoundIoFormatFloat64FE;
-    device->formats[12] = SoundIoFormatS16NE;
-    device->formats[13] = SoundIoFormatS16FE;
-    device->formats[14] = SoundIoFormatU16NE;
-    device->formats[15] = SoundIoFormatU16FE;
-    device->formats[16] = SoundIoFormatS8;
-    device->formats[17] = SoundIoFormatU8;
+    device->formats.push_back(SoundIoFormatFloat32NE);
+    device->formats.push_back(SoundIoFormatFloat32FE);
+    device->formats.push_back(SoundIoFormatS32NE);
+    device->formats.push_back(SoundIoFormatS32FE);
+    device->formats.push_back(SoundIoFormatU32NE);
+    device->formats.push_back(SoundIoFormatU32FE);
+    device->formats.push_back(SoundIoFormatS24NE);
+    device->formats.push_back(SoundIoFormatS24FE);
+    device->formats.push_back(SoundIoFormatU24NE);
+    device->formats.push_back(SoundIoFormatU24FE);
+    device->formats.push_back(SoundIoFormatFloat64NE);
+    device->formats.push_back(SoundIoFormatFloat64FE);
+    device->formats.push_back(SoundIoFormatS16NE);
+    device->formats.push_back(SoundIoFormatS16FE);
+    device->formats.push_back(SoundIoFormatU16NE);
+    device->formats.push_back(SoundIoFormatU16FE);
+    device->formats.push_back(SoundIoFormatS8);
+    device->formats.push_back(SoundIoFormatU8);
 
     return 0;
 }
@@ -478,17 +481,17 @@ static int set_all_device_channel_layouts(std::shared_ptr<SoundIoDevice> device)
 int soundio_dummy_init(std::shared_ptr<SoundIoPrivate> si)
 {
     std::shared_ptr<SoundIo> soundio = si;
-    struct SoundIoDummy* sid = &si->backend_data.dummy;
+    SoundIoDummy& sid = si->backend_data->dummy;
 
-    sid->mutex = soundio_os_mutex_create();
-    if (!sid->mutex)
+    sid.mutex = soundio_os_mutex_create();
+    if (!sid.mutex)
     {
         destroy_dummy(si);
         return SoundIoErrorNoMem;
     }
 
-    sid->cond = soundio_os_cond_create();
-    if (!sid->cond)
+    sid.cond = soundio_os_cond_create();
+    if (!sid.cond)
     {
         destroy_dummy(si);
         return SoundIoErrorNoMem;

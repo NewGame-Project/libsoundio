@@ -307,6 +307,8 @@ std::shared_ptr<SoundIo> soundio_create(void)
 int soundio_connect(std::shared_ptr<SoundIo> soundio)
 {
     int err = 0;
+    std::shared_ptr<SoundIoPrivate> si = std::dynamic_pointer_cast<SoundIoPrivate>(soundio);
+    si->backend_data = std::make_unique<SoundIoBackendData>();
 
     for (auto i = 0; i < std::size(available_backends); i += 1)
     {
@@ -326,15 +328,21 @@ int soundio_connect_backend(std::shared_ptr<SoundIo> soundio, enum SoundIoBacken
     std::shared_ptr<SoundIoPrivate> si = std::dynamic_pointer_cast<SoundIoPrivate>(soundio);
 
     if (soundio->current_backend)
+    {
         return SoundIoErrorInvalid;
+    }
 
     if (backend <= 0 || backend > SoundIoBackendDummy)
+    {
         return SoundIoErrorInvalid;
+    }
 
     int (*fn)(std::shared_ptr<SoundIoPrivate>) = backend_init_fns[backend];
 
     if (!fn)
+    {
         return SoundIoErrorBackendUnavailable;
+    }
 
     int err;
     if ((err = backend_init_fns[backend](si)))
@@ -358,7 +366,7 @@ void soundio_disconnect(std::shared_ptr<SoundIo> soundio)
     {
         si->destroy(si);
     }
-    si->backend_data = {};
+    si->backend_data = nullptr;
 
     soundio->current_backend = SoundIoBackendNone;
 
@@ -866,7 +874,7 @@ bool soundio_have_backend(enum SoundIoBackend backend)
 
 int soundio_backend_count(std::shared_ptr<SoundIo> soundio)
 {
-    return ARRAY_LENGTH(available_backends);
+    return std::size(available_backends);
 }
 
 enum SoundIoBackend soundio_get_backend(std::shared_ptr<SoundIo> soundio, int index)
@@ -924,10 +932,12 @@ void soundio_device_sort_channel_layouts(std::shared_ptr<SoundIoDevice> device)
 
 bool soundio_device_supports_format(std::shared_ptr<SoundIoDevice> device, enum SoundIoFormat format)
 {
-    for (int i = 0; i < device->format_count; ++i)
+    for (int i = 0; i < device->formats.size(); ++i)
     {
         if (device->formats[i] == format)
+        {
             return true;
+        }
     }
     return false;
 }
