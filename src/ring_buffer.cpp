@@ -14,7 +14,10 @@
 #include "soundio_private.h"
 #include "util.h"
 
+#ifdef __APPLE__
 #define _DARWIN_C_SOURCE
+#endif
+
 #include <sys/mman.h>
 
 
