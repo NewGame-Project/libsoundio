@@ -1124,7 +1124,6 @@ static int refresh_devices(std::shared_ptr<SoundIoPrivate> si)
     }
 
     soundio_os_mutex_lock(siw.mutex);
-    // soundio_destroy_devices_info(siw->ready_devices_info);
     siw.ready_devices_info = std::move(rd->devices_info);
     siw.have_devices_flag = true;
     soundio_os_cond_signal(siw.cond.get(), siw.mutex.get());
@@ -2506,12 +2505,12 @@ static int instream_pause_wasapi(std::shared_ptr<SoundIoPrivate> si, std::shared
 
 static int instream_start_wasapi(std::shared_ptr<SoundIoPrivate> si, std::shared_ptr<SoundIoInStreamPrivate> is)
 {
-    struct SoundIoInStreamWasapi* isw = &is->backend_data.wasapi;
+    SoundIoInStreamWasapi& isw = is->backend_data.wasapi;
 
-    soundio_os_mutex_lock(isw->mutex);
-    isw->started = true;
-    soundio_os_cond_signal(isw->start_cond.get(), isw->mutex.get());
-    soundio_os_mutex_unlock(isw->mutex);
+    soundio_os_mutex_lock(isw.mutex);
+    isw.started = true;
+    soundio_os_cond_signal(isw.start_cond.get(), isw.mutex.get());
+    soundio_os_mutex_unlock(isw.mutex);
 
     return 0;
 }
@@ -2605,7 +2604,6 @@ static void destroy_wasapi(std::shared_ptr<SoundIoPrivate> si)
         siw.abort_flag = true;
         soundio_os_cond_signal(siw.scan_devices_cond.get(), siw.scan_devices_mutex.get());
         soundio_os_mutex_unlock(siw.scan_devices_mutex);
-        // soundio_os_thread_destroy(siw->thread);
         siw.thread = nullptr;
     }
 
@@ -2613,26 +2611,6 @@ static void destroy_wasapi(std::shared_ptr<SoundIoPrivate> si)
     siw.scan_devices_cond = nullptr;
     siw.scan_devices_mutex = nullptr;
     siw.mutex = nullptr;
-
-    // if (siw.cond)
-    // {
-    //     soundio_os_cond_destroy(siw.cond);
-    // }
-    //
-    // if (siw.scan_devices_cond)
-    // {
-    //     soundio_os_cond_destroy(siw.scan_devices_cond);
-    // }
-    //
-    // if (siw.scan_devices_mutex)
-    // {
-    //     soundio_os_mutex_destroy(siw.scan_devices_mutex);
-    // }
-    //
-    // if (siw.mutex)
-    // {
-    //     soundio_os_mutex_destroy(siw.mutex);
-    // }
 }
 
 
@@ -2708,7 +2686,8 @@ STDMETHODIMP soundio_NotificationClient::OnDefaultDeviceChanged(EDataFlow flow, 
 
 STDMETHODIMP soundio_NotificationClient::OnPropertyValueChanged(LPCWSTR wid, const PROPERTYKEY key)
 {
-    return queue_device_scan(this);
+    return S_OK;
+    // return queue_device_scan(this);
 }
 
 

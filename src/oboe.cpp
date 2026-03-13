@@ -25,24 +25,19 @@ static enum SoundIoDeviceAim aims[] = {
 // }
 
 
-static int refresh_devices(std::shared_ptr<SoundIoPrivate> si)
+static int refresh_devices(std::shared_ptr<SoundIoPrivate>& si)
 {
     std::shared_ptr<SoundIo> soundio = si;
     SoundIoOboe& sio = si->backend_data->oboe;
 
-    int err;
-
     std::unique_ptr<SoundIoDevicesInfo> devices_info = std::make_unique<SoundIoDevicesInfo>();
-
     if (!devices_info)
     {
         return SoundIoErrorNoMem;
     }
 
-    devices_info->default_output_index = 0;
-    devices_info->default_input_index = 0;
-
-    // AVAudioSession* session = AVAudioSession.sharedInstance;
+    devices_info->default_output_index = -1;
+    devices_info->default_input_index = -1;
 
     for (int aim_i = 0; aim_i < std::size(aims); aim_i += 1)
     {
@@ -51,10 +46,8 @@ static int refresh_devices(std::shared_ptr<SoundIoPrivate> si)
 
         if (!dev)
         {
-            // deinit_sound_io_devices_info(&devices_info);
             return SoundIoErrorNoMem;
         }
-
 
         // dev->ref_count = 1;
         dev->soundio = soundio;
@@ -75,9 +68,6 @@ static int refresh_devices(std::shared_ptr<SoundIoPrivate> si)
         }
 
         dev->layouts.push_back(dev->current_layout);
-
-
-        // device->sample_rate_current = session.sampleRate;
         dev->sample_rate_current = 0; // 系统给什么用什么
 
         SoundIoSampleRateRange range{};
@@ -85,7 +75,6 @@ static int refresh_devices(std::shared_ptr<SoundIoPrivate> si)
         range.max = dev->sample_rate_current;
         dev->sample_rates.push_back(range);
 
-        // device->software_latency_current = aim == SoundIoDeviceAimOutput ? session.outputLatency : session.inputLatency;
         dev->software_latency_current = 0.01; // 默认十毫秒
         dev->software_latency_min = 0.001;
         dev->software_latency_max = 1;
@@ -106,6 +95,9 @@ static int refresh_devices(std::shared_ptr<SoundIoPrivate> si)
 
     soundio_os_mutex_lock(sio.mutex);
     sio.ready_devices_info = std::move(devices_info);
+    SOUNDIO_ATOMIC_STORE(sio.have_devices_flag, true);
+    soundio_os_cond_signal(sio.cond.get(), sio.mutex.get());
+    soundio->on_events_signal(soundio);
     soundio_os_mutex_unlock(sio.mutex);
 
     return 0;
@@ -117,62 +109,60 @@ static void shutdown_backend(std::shared_ptr<SoundIoPrivate> si, int err)
     SoundIoOboe& sio = si->backend_data->oboe;
     soundio_os_mutex_lock(sio.mutex);
     sio.shutdown_err = err;
-    SOUNDIO_ATOMIC_STORE(sio.have_devices_flag, true);
-    soundio_os_mutex_unlock(sio.mutex);
-    soundio_os_cond_signal(sio.cond.get(), NULL);
-    soundio_os_cond_signal(sio.have_devices_cond.get(), NULL);
+    soundio_os_cond_signal(sio.cond.get(), sio.mutex.get());
     soundio->on_events_signal(soundio);
+    soundio_os_mutex_unlock(sio.mutex);
 }
 
 static void device_thread_run(std::shared_ptr<void> arg)
 {
     std::shared_ptr<SoundIoPrivate> si = std::static_pointer_cast<SoundIoPrivate>(arg);
-    std::shared_ptr<SoundIo> soundio = si;
     SoundIoOboe& sio = si->backend_data->oboe;
     int err;
 
+    soundio_os_mutex_lock(sio.scan_devices_mutex);
     for (;;)
     {
         if (!SOUNDIO_ATOMIC_FLAG_TEST_AND_SET(sio.abort_flag))
+        {
             break;
-        if (SOUNDIO_ATOMIC_LOAD(sio.service_restarted))
-        {
-            shutdown_backend(si, SoundIoErrorBackendDisconnected);
-            return;
         }
-        if (SOUNDIO_ATOMIC_EXCHANGE(sio.device_scan_queued, false))
+        if (SOUNDIO_ATOMIC_LOAD(sio.device_scan_queued))
         {
+            SOUNDIO_ATOMIC_STORE(sio.device_scan_queued, false);
+            soundio_os_mutex_unlock(sio.scan_devices_mutex);
             err = refresh_devices(si);
             if (err)
             {
                 shutdown_backend(si, err);
+                return;
             }
 
-            if (!SOUNDIO_ATOMIC_EXCHANGE(sio.have_devices_flag, true))
-                soundio_os_cond_signal(sio.have_devices_cond.get(), NULL);
-            soundio_os_cond_signal(sio.cond.get(), NULL);
-            soundio->on_events_signal(soundio);
+            soundio_os_mutex_lock(sio.scan_devices_mutex);
+            continue;
         }
-        soundio_os_cond_wait(sio.scan_devices_cond.get(), NULL);
+        soundio_os_cond_wait(sio.scan_devices_cond.get(), sio.scan_devices_mutex.get());
     }
+    soundio_os_mutex_unlock(sio.scan_devices_mutex);
 }
 
-
-static void flush_events_oboe(std::shared_ptr<SoundIoPrivate> si)
+static void my_flush_events(std::shared_ptr<SoundIoPrivate>& si, bool wait)
 {
     std::shared_ptr<SoundIo> soundio = si;
     SoundIoOboe& sio = si->backend_data->oboe;
 
-    // block until have devices
-    while (!SOUNDIO_ATOMIC_LOAD(sio.have_devices_flag))
-    {
-        soundio_os_cond_wait(sio.have_devices_cond.get(), NULL);
-    }
-
     bool change = false;
     bool cb_shutdown = false;
+    // std::shared_ptr<SoundIoDevicesInfo> old_devices_info = NULL;
 
     soundio_os_mutex_lock(sio.mutex);
+
+    // block until have devices
+    while (wait || (!SOUNDIO_ATOMIC_LOAD(sio.have_devices_flag) && !sio.shutdown_err))
+    {
+        soundio_os_cond_wait(sio.cond.get(), sio.mutex.get());
+        wait = false;
+    }
 
     if (sio.shutdown_err && !sio.emitted_shutdown_cb)
     {
@@ -182,7 +172,6 @@ static void flush_events_oboe(std::shared_ptr<SoundIoPrivate> si)
     else if (sio.ready_devices_info)
     {
         si->safe_devices_info = std::move(sio.ready_devices_info);
-        sio.ready_devices_info = NULL;
         change = true;
     }
 
@@ -192,40 +181,44 @@ static void flush_events_oboe(std::shared_ptr<SoundIoPrivate> si)
         soundio->on_backend_disconnect(soundio, sio.shutdown_err);
     else if (change)
         soundio->on_devices_change(soundio);
+}
 
-    // soundio_destroy_devices_info(old_devices_info);
+
+static void flush_events_oboe(std::shared_ptr<SoundIoPrivate> si)
+{
+    my_flush_events(si, false);
 }
 
 static void wait_events_oboe(std::shared_ptr<SoundIoPrivate> si)
 {
-    SoundIoOboe& sio = si->backend_data->oboe;
-    flush_events_oboe(si);
-    soundio_os_cond_wait(sio.cond.get(), NULL);
+    my_flush_events(si, true);
 }
 
 static void wakeup_oboe(std::shared_ptr<SoundIoPrivate> si)
 {
     SoundIoOboe& sio = si->backend_data->oboe;
-    soundio_os_cond_signal(sio.cond.get(), NULL);
+    soundio_os_cond_signal(sio.cond.get(), sio.mutex.get());
 }
 
 static void force_device_scan_oboe(std::shared_ptr<SoundIoPrivate> si)
 {
     SoundIoOboe& sio = si->backend_data->oboe;
+    soundio_os_mutex_lock(sio.scan_devices_mutex);
     SOUNDIO_ATOMIC_STORE(sio.device_scan_queued, true);
-    soundio_os_cond_signal(sio.scan_devices_cond.get(), NULL);
+    soundio_os_cond_signal(sio.scan_devices_cond.get(), sio.scan_devices_mutex.get());
+    soundio_os_mutex_unlock(sio.scan_devices_mutex);
 }
 
 static void outstream_destroy_oboe(std::shared_ptr<SoundIoPrivate> si, std::shared_ptr<SoundIoOutStreamPrivate> os)
 {
     struct SoundIoOutStreamOboe* oso = &os->backend_data.oboe;
-    if (oso->output_stream)
+    if (oso->audio_stream)
     {
-        oso->output_stream->requestStop();
-        oso->output_stream->close();
+        oso->audio_stream->requestStop();
+        oso->audio_stream->close();
     }
 
-    oso->output_stream = nullptr;
+    oso->audio_stream = nullptr;
     oso->callback = nullptr;
 }
 
@@ -275,16 +268,16 @@ static int outstream_open_oboe(std::shared_ptr<SoundIoPrivate> si, std::shared_p
         return SoundIoErrorOpeningDevice;
     }
 
-    oso.output_stream.reset(raw_stream);
+    oso.audio_stream.reset(raw_stream);
     raw_stream = nullptr;
 
-    outstream->sample_rate = oso.output_stream->getSampleRate();
-    outstream->bytes_per_frame = oso.output_stream->getBytesPerFrame();
-    outstream->bytes_per_sample = oso.output_stream->getBytesPerSample();
-    sdo->latency_frames = oso.output_stream->getBufferSizeInFrames();
+    outstream->sample_rate = oso.audio_stream->getSampleRate();
+    outstream->bytes_per_frame = oso.audio_stream->getBytesPerFrame();
+    outstream->bytes_per_sample = oso.audio_stream->getBytesPerSample();
+    sdo->latency_frames = oso.audio_stream->getBufferSizeInFrames();
     if (sdo->latency_frames <= 0)
     {
-        sdo->latency_frames = oso.output_stream->getBufferCapacityInFrames();
+        sdo->latency_frames = oso.audio_stream->getBufferCapacityInFrames();
     }
 
     oso.hardware_latency = static_cast<double>(sdo->latency_frames) / outstream->sample_rate;
@@ -296,7 +289,7 @@ static int outstream_open_oboe(std::shared_ptr<SoundIoPrivate> si, std::shared_p
 static int outstream_pause_oboe(std::shared_ptr<SoundIoPrivate> si, std::shared_ptr<SoundIoOutStreamPrivate> os, bool pause)
 {
     struct SoundIoOutStreamOboe* osca = &os->backend_data.oboe;
-    std::unique_ptr<oboe::AudioStream>& stream = osca->output_stream;
+    std::unique_ptr<oboe::AudioStream>& stream = osca->audio_stream;
     oboe::Result result;
     if (pause)
     {
@@ -366,9 +359,9 @@ static int outstream_get_latency_oboe(std::shared_ptr<SoundIoPrivate> si, std::s
 {
     struct SoundIoOutStreamOboe* oso = &os->backend_data.oboe;
 
-    if (oso->output_stream)
+    if (oso->audio_stream)
     {
-        std::unique_ptr<oboe::AudioStream>& stream = oso->output_stream;
+        std::unique_ptr<oboe::AudioStream>& stream = oso->audio_stream;
         // 通过 Oboe 进行实时运算，能测算出真实物理和缓冲折叠造成的完整精确延迟。
         auto result = stream->calculateLatencyMillis();
         if (result.error() == oboe::Result::OK)
@@ -433,16 +426,17 @@ static void destroy_oboe(std::shared_ptr<SoundIoPrivate> si)
 
     if (sio.thread)
     {
+        soundio_os_mutex_lock(sio.scan_devices_mutex);
         SOUNDIO_ATOMIC_FLAG_CLEAR(sio.abort_flag);
-        soundio_os_cond_signal(sio.scan_devices_cond.get(), NULL);
-        // soundio_os_thread_destroy(sio->thread);
+        soundio_os_cond_signal(sio.scan_devices_cond.get(), sio.scan_devices_mutex.get());
+        soundio_os_mutex_unlock(sio.scan_devices_mutex);
+        sio.thread = nullptr;
     }
-    sio.cond = nullptr;
-    sio.have_devices_cond = nullptr;
-    sio.scan_devices_cond = nullptr;
-    sio.mutex = nullptr;
 
-    // soundio_destroy_devices_info(sio->ready_devices_info);
+    sio.cond = nullptr;
+    sio.mutex = nullptr;
+    sio.scan_devices_cond = nullptr;
+    sio.scan_devices_mutex = nullptr;
 }
 
 int soundio_oboe_init(std::shared_ptr<SoundIoPrivate> si)
@@ -452,7 +446,6 @@ int soundio_oboe_init(std::shared_ptr<SoundIoPrivate> si)
     int32_t err;
     SOUNDIO_ATOMIC_STORE(sio.have_devices_flag, false);
     SOUNDIO_ATOMIC_STORE(sio.device_scan_queued, true);
-    SOUNDIO_ATOMIC_STORE(sio.service_restarted, false);
     SOUNDIO_ATOMIC_FLAG_TEST_AND_SET(sio.abort_flag);
 
     sio.mutex = soundio_os_mutex_create();
@@ -469,8 +462,8 @@ int soundio_oboe_init(std::shared_ptr<SoundIoPrivate> si)
         return SoundIoErrorNoMem;
     }
 
-    sio.have_devices_cond = soundio_os_cond_create();
-    if (!sio.have_devices_cond)
+    sio.scan_devices_mutex = soundio_os_mutex_create();
+    if (!sio.scan_devices_mutex)
     {
         destroy_oboe(si);
         return SoundIoErrorNoMem;

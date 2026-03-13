@@ -445,7 +445,9 @@ void soundio_os_cond_wait(SoundIoOsCond* cond, SoundIoOsMutex* locked_mutex)
     }
     SleepConditionVariableCS(&cond->id, target_cs, INFINITE);
     if (!locked_mutex)
+    {
         LeaveCriticalSection(&cond->default_cs_id);
+    }
 #elif defined(SOUNDIO_OS_KQUEUE)
     struct kevent kev;
     struct kevent out_kev;
